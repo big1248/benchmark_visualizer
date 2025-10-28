@@ -8,6 +8,54 @@ import glob
 from pathlib import Path
 import numpy as np
 from scipy import stats
+import os, io, zipfile, requests
+
+def ensure_data_from_release():
+    """
+    1) ./data 폴더가 없거나 비어 있으면
+    2) GitHub Releases의 최신 릴리스에서 data.zip을 받아
+    3) 프로젝트 루트(./)에 풀어 data/를 제공한다.
+
+    환경변수:
+      GH_REPO        = "owner/repo"  (예: "kjs9964/benchmark_visualizer")
+      GH_ASSET_NAME  = "data.zip"    (생략 시 기본값)
+      GH_RELEASE_TAG = "v2.2.0" 등   (지정하면 해당 태그 릴리스에서 받음, 없으면 latest)
+    퍼블릭 릴리스는 토큰 불필요.
+    """
+    data_dir = "./data"
+    if os.path.isdir(data_dir) and any(os.scandir(data_dir)):
+        return  # 이미 데이터가 있음
+
+    repo = os.environ.get("GH_REPO", "kjs9964/benchmark_visualizer")
+    asset_name = os.environ.get("GH_ASSET_NAME", "data.zip")
+    release_tag = os.environ.get("GH_RELEASE_TAG", "").strip()
+
+    # 릴리스 메타 조회
+    base = f"https://api.github.com/repos/{repo}/releases"
+    url = f"{base}/tags/{release_tag}" if release_tag else f"{base}/latest"
+    r = requests.get(url, headers={"Accept": "application/vnd.github+json"}, timeout=30)
+    r.raise_for_status()
+    release = r.json()
+
+    # asset 찾기
+    asset = next((a for a in release.get("assets", []) if a.get("name") == asset_name), None)
+    if not asset:
+        print(f"[warn] Release asset '{asset_name}' not found in {release.get('tag_name')}.")
+        return
+
+    # 퍼블릭은 browser_download_url로 바로 가능
+    dl = requests.get(asset["browser_download_url"], timeout=120)
+    dl.raise_for_status()
+
+    # unzip (zip 안에 data/ 최상위 폴더가 있도록 압축해 두세요)
+    with zipfile.ZipFile(io.BytesIO(dl.content)) as z:
+        z.extractall(".")
+
+# --- call once before any CSV loading ---
+try:
+    ensure_data_from_release()
+except Exception as e:
+    print(f"[warn] data fetch skipped: {e}")
 
 # 페이지 설정
 st.set_page_config(

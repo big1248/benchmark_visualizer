@@ -8,54 +8,85 @@ import glob
 from pathlib import Path
 import numpy as np
 from scipy import stats
-import os, io, zipfile, requests
+import os, io, zipfile, requests, shutil, tempfile
 
 def ensure_data_from_release():
     """
-    1) ./data 폴더가 없거나 비어 있으면
-    2) GitHub Releases의 최신 릴리스에서 data.zip을 받아
-    3) 프로젝트 루트(./)에 풀어 data/를 제공한다.
-
-    환경변수:
-      GH_REPO        = "owner/repo"  (예: "kjs9964/benchmark_visualizer")
-      GH_ASSET_NAME  = "data.zip"    (생략 시 기본값)
-      GH_RELEASE_TAG = "v2.2.0" 등   (지정하면 해당 태그 릴리스에서 받음, 없으면 latest)
+    ./data가 없거나 비어 있으면 GitHub Releases의 data.zip을 받아 ./data를 보장한다.
     퍼블릭 릴리스는 토큰 불필요.
+    환경변수:
+      GH_REPO="kjs9964/benchmark_visualizer"
+      GH_ASSET_NAME="data.zip" (기본)
+      GH_RELEASE_TAG="v2.2.0" (선택; 없으면 latest)
     """
     data_dir = "./data"
+    # 이미 데이터 있으면 스킵
     if os.path.isdir(data_dir) and any(os.scandir(data_dir)):
-        return  # 이미 데이터가 있음
+        return
+
+    os.makedirs(data_dir, exist_ok=True)  # 최소한 경로는 만든다
 
     repo = os.environ.get("GH_REPO", "kjs9964/benchmark_visualizer")
     asset_name = os.environ.get("GH_ASSET_NAME", "data.zip")
     release_tag = os.environ.get("GH_RELEASE_TAG", "").strip()
 
-    # 릴리스 메타 조회
-    base = f"https://api.github.com/repos/{repo}/releases"
-    url = f"{base}/tags/{release_tag}" if release_tag else f"{base}/latest"
-    r = requests.get(url, headers={"Accept": "application/vnd.github+json"}, timeout=30)
-    r.raise_for_status()
-    release = r.json()
+    try:
+        # 1) 릴리스 메타
+        base = f"https://api.github.com/repos/{repo}/releases"
+        url = f"{base}/tags/{release_tag}" if release_tag else f"{base}/latest"
+        r = requests.get(url, headers={"Accept": "application/vnd.github+json"}, timeout=30)
+        r.raise_for_status()
+        release = r.json()
 
-    # asset 찾기
-    asset = next((a for a in release.get("assets", []) if a.get("name") == asset_name), None)
-    if not asset:
-        print(f"[warn] Release asset '{asset_name}' not found in {release.get('tag_name')}.")
-        return
+        # 2) 에셋 찾기
+        asset = next((a for a in release.get("assets", []) if a.get("name") == asset_name), None)
+        if not asset:
+            print(f"[warn] Release asset '{asset_name}' not found in {release.get('tag_name')}.")
+            return  # data/는 비어있을 수 있음
 
-    # 퍼블릭은 browser_download_url로 바로 가능
-    dl = requests.get(asset["browser_download_url"], timeout=120)
-    dl.raise_for_status()
+        # 3) 다운로드
+        dl = requests.get(asset["browser_download_url"], timeout=120)
+        dl.raise_for_status()
 
-    # unzip (zip 안에 data/ 최상위 폴더가 있도록 압축해 두세요)
-    with zipfile.ZipFile(io.BytesIO(dl.content)) as z:
-        z.extractall(".")
+        # 4) 임시 폴더에 압축 해제
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with zipfile.ZipFile(io.BytesIO(dl.content)) as z:
+                z.extractall(tmpdir)
 
-# --- call once before any CSV loading ---
-try:
-    ensure_data_from_release()
-except Exception as e:
-    print(f"[warn] data fetch skipped: {e}")
+            # 5) 추출 결과 해석
+            #    케이스1) tmpdir/data/... 형태 → 그대로 ./data로 이동
+            if os.path.isdir(os.path.join(tmpdir, "data")):
+                # 기존 ./data 비우고 교체
+                for f in os.listdir(data_dir):
+                    fp = os.path.join(data_dir, f)
+                    if os.path.isdir(fp):
+                        shutil.rmtree(fp)
+                    else:
+                        os.remove(fp)
+                # data/* -> ./data
+                for f in os.listdir(os.path.join(tmpdir, "data")):
+                    src = os.path.join(tmpdir, "data", f)
+                    dst = os.path.join(data_dir, f)
+                    if os.path.isdir(src):
+                        shutil.copytree(src, dst, dirs_exist_ok=True)
+                    else:
+                        shutil.copy2(src, dst)
+            else:
+                # 케이스2) 최상단에 csv들이 바로 있는 경우 → ./data로 모두 이동
+                # 케이스3) 기타 구조 → 모든 csv를 ./data로 수집
+                moved = 0
+                for root, _, files in os.walk(tmpdir):
+                    for name in files:
+                        if name.lower().endswith(".csv"):
+                            src = os.path.join(root, name)
+                            dst = os.path.join(data_dir, name)
+                            shutil.copy2(src, dst)
+                            moved += 1
+                if moved == 0:
+                    print("[warn] No CSV files found in the downloaded zip.")
+    except Exception as e:
+        print(f"[warn] data fetch skipped due to error: {e}")
+        # data/ 경로는 이미 만들어 두었으므로 경로 에러는 나지 않음
 
 # 페이지 설정
 st.set_page_config(

@@ -2,14 +2,6 @@
 # 📦 Python & Streamlit project
 # -----------------------------
 
-# Data (CSV 등) - 커밋 금지
-data/
-*.csv
-*.xlsx
-*.parquet
-*.json
-*.zip
-
 # Python cache & virtual environments
 __pycache__/
 *.pyc

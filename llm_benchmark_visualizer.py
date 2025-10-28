@@ -8,85 +8,38 @@ import glob
 from pathlib import Path
 import numpy as np
 from scipy import stats
-import os, io, zipfile, requests, shutil, tempfile
 
-def ensure_data_from_release():
-    """
-    ./data가 없거나 비어 있으면 GitHub Releases의 data.zip을 받아 ./data를 보장한다.
-    퍼블릭 릴리스는 토큰 불필요.
-    환경변수:
-      GH_REPO="kjs9964/benchmark_visualizer"
-      GH_ASSET_NAME="data.zip" (기본)
-      GH_RELEASE_TAG="v2.2.0" (선택; 없으면 latest)
-    """
-    data_dir = "./data"
-    # 이미 데이터 있으면 스킵
-    if os.path.isdir(data_dir) and any(os.scandir(data_dir)):
-        return
+import streamlit as st
+import requests
+import zipfile
+import os
 
-    os.makedirs(data_dir, exist_ok=True)  # 최소한 경로는 만든다
-
-    repo = os.environ.get("GH_REPO", "kjs9964/benchmark_visualizer")
-    asset_name = os.environ.get("GH_ASSET_NAME", "data.zip")
-    release_tag = os.environ.get("GH_RELEASE_TAG", "").strip()
-
-    try:
-        # 1) 릴리스 메타
-        base = f"https://api.github.com/repos/{repo}/releases"
-        url = f"{base}/tags/{release_tag}" if release_tag else f"{base}/latest"
-        r = requests.get(url, headers={"Accept": "application/vnd.github+json"}, timeout=30)
-        r.raise_for_status()
-        release = r.json()
-
-        # 2) 에셋 찾기
-        asset = next((a for a in release.get("assets", []) if a.get("name") == asset_name), None)
-        if not asset:
-            print(f"[warn] Release asset '{asset_name}' not found in {release.get('tag_name')}.")
-            return  # data/는 비어있을 수 있음
-
-        # 3) 다운로드
-        dl = requests.get(asset["browser_download_url"], timeout=120)
-        dl.raise_for_status()
-
-        # 4) 임시 폴더에 압축 해제
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with zipfile.ZipFile(io.BytesIO(dl.content)) as z:
-                z.extractall(tmpdir)
-
-            # 5) 추출 결과 해석
-            #    케이스1) tmpdir/data/... 형태 → 그대로 ./data로 이동
-            if os.path.isdir(os.path.join(tmpdir, "data")):
-                # 기존 ./data 비우고 교체
-                for f in os.listdir(data_dir):
-                    fp = os.path.join(data_dir, f)
-                    if os.path.isdir(fp):
-                        shutil.rmtree(fp)
-                    else:
-                        os.remove(fp)
-                # data/* -> ./data
-                for f in os.listdir(os.path.join(tmpdir, "data")):
-                    src = os.path.join(tmpdir, "data", f)
-                    dst = os.path.join(data_dir, f)
-                    if os.path.isdir(src):
-                        shutil.copytree(src, dst, dirs_exist_ok=True)
-                    else:
-                        shutil.copy2(src, dst)
-            else:
-                # 케이스2) 최상단에 csv들이 바로 있는 경우 → ./data로 모두 이동
-                # 케이스3) 기타 구조 → 모든 csv를 ./data로 수집
-                moved = 0
-                for root, _, files in os.walk(tmpdir):
-                    for name in files:
-                        if name.lower().endswith(".csv"):
-                            src = os.path.join(root, name)
-                            dst = os.path.join(data_dir, name)
-                            shutil.copy2(src, dst)
-                            moved += 1
-                if moved == 0:
-                    print("[warn] No CSV files found in the downloaded zip.")
-    except Exception as e:
-        print(f"[warn] data fetch skipped due to error: {e}")
-        # data/ 경로는 이미 만들어 두었으므로 경로 에러는 나지 않음
+@st.cache_data(ttl=86400)  # 24시간 캐시
+def download_data_from_github():
+    """GitHub Releases에서 데이터 다운로드"""
+    
+    if not os.path.exists('./data'):
+        with st.spinner('데이터 다운로드 중... (최초 1회만)'):
+            # GitHub Release URL
+            repo = "kjs9964/benchmark_visualizer"
+            tag = "v2.2.0"
+            filename = "data.zip"
+            url = f"https://github.com/{repo}/releases/download/{tag}/{filename}"
+            
+            # 다운로드
+            response = requests.get(url, stream=True)
+            with open('data.zip', 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            # 압축 해제
+            with zipfile.ZipFile('data.zip', 'r') as zip_ref:
+                zip_ref.extractall('.')
+            
+            os.remove('data.zip')
+            st.success('데이터 다운로드 완료!')
+    
+    return './data'
 
 # 페이지 설정
 st.set_page_config(

@@ -14,32 +14,54 @@ import requests
 import zipfile
 import os
 
-@st.cache_data(ttl=86400)  # 24시간 캐시
+@st.cache_data(ttl=86400)
 def download_data_from_github():
     """GitHub Releases에서 데이터 다운로드"""
     
-    if not os.path.exists('./data'):
-        with st.spinner('데이터 다운로드 중... (최초 1회만)'):
-            # GitHub Release URL
-            repo = "kjs9964/benchmark_visualizer"
-            tag = "v2.2.0"
-            filename = "data.zip"
-            url = f"https://github.com/{repo}/releases/download/{tag}/{filename}"
-            
-            # 다운로드
-            response = requests.get(url, stream=True)
-            with open('data.zip', 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            
-            # 압축 해제
-            with zipfile.ZipFile('data.zip', 'r') as zip_ref:
-                zip_ref.extractall('.')
-            
-            os.remove('data.zip')
-            st.success('데이터 다운로드 완료!')
+    data_dir = Path('./data')
     
-    return './data'
+    # 이미 있으면 스킵
+    if data_dir.exists() and len(list(data_dir.glob('*.csv'))) > 0:
+        return
+    
+    try:
+        # 기존 data 폴더 삭제
+        if data_dir.exists():
+            import shutil
+            shutil.rmtree(data_dir)
+        
+        repo = "kjs9964/benchmark_visualizer"
+        tag = "v2.2.0"
+        url = f"https://github.com/{repo}/releases/download/{tag}/data.zip"
+        
+        # 다운로드
+        st.info("📥 데이터 다운로드 중...")
+        response = requests.get(url, timeout=60)
+        response.raise_for_status()
+        
+        # 저장 및 압축 해제
+        with open('data.zip', 'wb') as f:
+            f.write(response.content)
+        
+        with zipfile.ZipFile('data.zip', 'r') as zip_ref:
+            zip_ref.extractall('.')
+        
+        os.remove('data.zip')
+        
+        # 검증
+        if not data_dir.exists():
+            raise Exception("data 폴더가 생성되지 않았습니다")
+        
+        csv_count = len(list(data_dir.glob('*.csv')))
+        if csv_count == 0:
+            raise Exception("CSV 파일이 없습니다")
+        
+        st.success(f"✅ 데이터 로드 완료 ({csv_count}개 파일)")
+        
+    except Exception as e:
+        st.error(f"❌ 데이터 다운로드 실패: {str(e)}")
+        st.error("GitHub Release 확인: https://github.com/kjs9964/benchmark_visualizer/releases")
+        st.stop()
 
 # 페이지 설정
 st.set_page_config(

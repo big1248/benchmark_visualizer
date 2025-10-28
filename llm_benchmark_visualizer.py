@@ -524,6 +524,9 @@ def get_testset_statistics(testsets, test_name, lang='ko'):
 
 # 메인 실행
 def main():
+    # 🔥 GitHub에서 데이터 다운로드 (최초 1회)
+    download_data_from_github()
+    
     # 언어 선택 (사이드바 상단에 배치)
     st.sidebar.selectbox(
         "Language / 언어",
@@ -550,9 +553,8 @@ def main():
     st.title(f"🎯 {t['title']}")
     st.markdown("---")
     
-    # 데이터 디렉토리 선택
-    default_dir = "." if os.path.exists("./testset_산업안전기사.csv") else "./data"
-    data_dir = st.sidebar.text_input(t['data_dir'], value=default_dir)
+    # 데이터 디렉토리는 항상 ./data (GitHub에서 다운로드한 폴더)
+    data_dir = "./data"
     
     if not os.path.exists(data_dir):
         st.error(f"Directory not found: {data_dir}")

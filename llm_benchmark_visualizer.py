@@ -1242,58 +1242,76 @@ def main():
         else:
             st.header(f"📅 {t['year_analysis']}")
             
-            # 연도별 성능
-            year_stats = filtered_df.groupby('Year').agg({
-                '정답여부': ['sum', 'count', 'mean']
-            }).reset_index()
-            year_stats.columns = ['연도', '정답', '총문제', '정확도']
-            year_stats['정확도'] = year_stats['정확도'] * 100
-            year_stats = year_stats.sort_values('연도')
+            # Year를 정수로 변환
+            filtered_df['Year_Int'] = filtered_df['Year'].apply(safe_convert_to_int)
+            year_df = filtered_df[filtered_df['Year_Int'].notna()].copy()
             
-            col1, col2 = st.columns([1, 2])
-            
-            with col1:
-                # 테이블
-                st.dataframe(
-                    year_stats.style.format({'정확도': '{:.2f}%'})
-                    .background_gradient(subset=['정확도'], cmap='RdYlGn'),
-                    use_container_width=True
+            if not year_df.empty:
+                # 연도별 성능
+                year_stats = year_df.groupby('Year_Int').agg({
+                    '정답여부': ['sum', 'count', 'mean']
+                }).reset_index()
+                year_stats.columns = ['연도', '정답', '총문제', '정확도']
+                year_stats['정확도'] = year_stats['정확도'] * 100
+                year_stats = year_stats.sort_values('연도')
+                
+                # 연도를 정수로 표시
+                year_stats['연도'] = year_stats['연도'].astype(int)
+                
+                col1, col2 = st.columns([1, 2])
+                
+                with col1:
+                    # 테이블 (소수점 없이 표시)
+                    st.dataframe(
+                        year_stats.style.format({
+                            '연도': '{:.0f}',
+                            '정답': '{:.0f}',
+                            '총문제': '{:.0f}',
+                            '정확도': '{:.2f}%'
+                        })
+                        .background_gradient(subset=['정확도'], cmap='RdYlGn'),
+                        use_container_width=True
+                    )
+                
+                with col2:
+                    # 라인 차트
+                    fig = px.line(
+                        year_stats,
+                        x='연도',
+                        y='정확도',
+                        title=t['year_performance'],
+                        markers=True,
+                        text='정확도'
+                    )
+                    fig.update_traces(texttemplate='%{text:.1f}%', textposition='top center')
+                    fig.update_layout(
+                        height=400,
+                        yaxis_title=t['accuracy'] + ' (%)',
+                        xaxis_title=t['year']
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # 모델별 연도 성능 히트맵
+                st.markdown("---")
+                year_model = year_df.groupby(['모델', 'Year_Int'])['정답여부'].mean() * 100
+                year_model_pivot = year_model.unstack(fill_value=0)
+                
+                # 컬럼명을 정수로 변환
+                year_model_pivot.columns = year_model_pivot.columns.astype(int)
+                
+                fig = px.imshow(
+                    year_model_pivot,
+                    labels=dict(x=t['year'], y=t['model'], color=t['accuracy'] + " (%)"),
+                    x=year_model_pivot.columns,
+                    y=year_model_pivot.index,
+                    color_continuous_scale='RdYlGn',
+                    aspect="auto",
+                    text_auto='.1f'  # 숫자 표시 추가
                 )
-            
-            with col2:
-                # 라인 차트
-                fig = px.line(
-                    year_stats,
-                    x='연도',
-                    y='정확도',
-                    title=t['year_performance'],
-                    markers=True,
-                    text='정확도'
-                )
-                fig.update_traces(texttemplate='%{text:.1f}%', textposition='top center')
-                fig.update_layout(
-                    height=400,
-                    yaxis_title=t['accuracy'] + ' (%)',
-                    xaxis_title=t['year']
-                )
+                fig.update_layout(height=400)
                 st.plotly_chart(fig, use_container_width=True)
-            
-            # 모델별 연도 성능 히트맵
-            st.markdown("---")
-            year_model = filtered_df.groupby(['모델', 'Year'])['정답여부'].mean() * 100
-            year_model_pivot = year_model.unstack(fill_value=0)
-            
-            fig = px.imshow(
-                year_model_pivot,
-                labels=dict(x=t['year'], y=t['model'], color=t['accuracy'] + " (%)"),
-                x=year_model_pivot.columns,
-                y=year_model_pivot.index,
-                color_continuous_scale='RdYlGn',
-                aspect="auto",
-                text_auto='.1f'  # 숫자 표시 추가
-            )
-            fig.update_layout(height=400)
-            st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("연도 정보가 있는 데이터가 없습니다.")
     
     # 탭 6: 오답 분석
     with tabs[5]:

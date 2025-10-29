@@ -720,7 +720,14 @@ def main():
     with tabs[0]:
         st.header(f"📊 {t['overview']}")
         
-        # 고유 문제 수 계산
+        # 테스트셋 기반으로 실제 문제 수 계산
+        total_problems = 0
+        if selected_tests:
+            for test_name in selected_tests:
+                if test_name in testsets:
+                    total_problems += len(testsets[test_name])
+        
+        # 고유 문제 수는 filtered_df에서 중복 제거 (백업용)
         unique_questions = filtered_df['Question'].nunique()
         num_models = filtered_df['모델'].nunique()
         
@@ -729,7 +736,9 @@ def main():
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.metric("총 문제 수", f"{unique_questions:,}")
+            # 테스트셋 파일의 실제 문제 수 사용
+            display_problems = total_problems if total_problems > 0 else unique_questions
+            st.metric("총 문제 수", f"{display_problems:,}")
         with col2:
             st.metric("평가 모델 수", f"{num_models}")
         with col3:
@@ -764,10 +773,25 @@ def main():
             st.markdown("---")
             st.subheader("⚖️ 법령/비법령 분석")
             
-            # 고유 문제 기준으로 법령/비법령 문제 수 계산
+            # 테스트셋 기반으로 법령/비법령 문제 수 계산
+            law_count_testset = 0
+            non_law_count_testset = 0
+            
+            if selected_tests:
+                for test_name in selected_tests:
+                    if test_name in testsets and 'law' in testsets[test_name].columns:
+                        test_df = testsets[test_name]
+                        law_count_testset += len(test_df[test_df['law'] == 'O'])
+                        non_law_count_testset += len(test_df[test_df['law'] != 'O'])
+            
+            # 백업: filtered_df에서 계산 (테스트셋이 없는 경우)
             unique_problems = filtered_df[['Question', 'law']].drop_duplicates()
-            law_count = len(unique_problems[unique_problems['law'] == 'O'])
-            non_law_count = len(unique_problems[unique_problems['law'] != 'O'])
+            law_count_backup = len(unique_problems[unique_problems['law'] == 'O'])
+            non_law_count_backup = len(unique_problems[unique_problems['law'] != 'O'])
+            
+            # 테스트셋 값이 있으면 사용, 없으면 백업 사용
+            law_count = law_count_testset if law_count_testset > 0 else law_count_backup
+            non_law_count = non_law_count_testset if non_law_count_testset > 0 else non_law_count_backup
             
             # 법령/비법령 정답률 (모든 모델 평균)
             law_df = filtered_df[filtered_df['law'] == 'O']

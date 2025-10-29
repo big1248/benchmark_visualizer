@@ -444,12 +444,16 @@ def safe_convert_to_int(value):
     except (ValueError, TypeError):
         return None
 
-def get_available_sessions(df, test_name):
-    """특정 테스트에서 사용 가능한 세션 목록 반환"""
+def get_available_sessions(df, test_names):
+    """특정 테스트들에서 사용 가능한 세션 목록 반환"""
     if df is None or len(df) == 0:
         return []
     
-    test_df = df[df['테스트명'] == test_name] if '테스트명' in df.columns else df
+    # 여러 테스트 선택 시 필터링
+    if test_names:
+        test_df = df[df['테스트명'].isin(test_names)] if '테스트명' in df.columns else df
+    else:
+        test_df = df
     
     if 'Session' in test_df.columns:
         sessions_raw = test_df['Session'].dropna().unique().tolist()
@@ -578,16 +582,18 @@ def main():
     st.sidebar.markdown("---")
     st.sidebar.markdown(f"## {t['filters']}")
     
-    # 테스트명 필터
+    # 테스트명 필터 (multiselect로 변경)
     test_names = sorted(results_df['테스트명'].unique().tolist())
-    selected_test = st.sidebar.selectbox(
+    selected_tests = st.sidebar.multiselect(
         t['testname'],
-        options=[t['all']] + test_names
+        options=test_names,
+        default=test_names,
+        help="여러 테스트를 선택할 수 있습니다"
     )
     
     # 테스트 선택에 따른 데이터 필터링
-    if selected_test != t['all']:
-        filtered_df = results_df[results_df['테스트명'] == selected_test].copy()
+    if selected_tests:
+        filtered_df = results_df[results_df['테스트명'].isin(selected_tests)].copy()
     else:
         filtered_df = results_df.copy()
     
@@ -602,39 +608,45 @@ def main():
     if selected_models:
         filtered_df = filtered_df[filtered_df['모델'].isin(selected_models)]
     
-    # 상세도 필터
+    # 상세도 필터 (multiselect로 변경)
     details = sorted(filtered_df['상세도'].unique().tolist())
-    selected_detail = st.sidebar.selectbox(
+    selected_details = st.sidebar.multiselect(
         t['detail_type'],
-        options=[t['all']] + details
+        options=details,
+        default=details,
+        help="여러 상세도를 선택할 수 있습니다"
     )
     
-    if selected_detail != t['all']:
-        filtered_df = filtered_df[filtered_df['상세도'] == selected_detail]
+    if selected_details:
+        filtered_df = filtered_df[filtered_df['상세도'].isin(selected_details)]
     
-    # 프롬프팅 방식 필터
+    # 프롬프팅 방식 필터 (multiselect로 변경)
     prompts = sorted(filtered_df['프롬프팅'].unique().tolist())
-    selected_prompt = st.sidebar.selectbox(
+    selected_prompts = st.sidebar.multiselect(
         t['prompting'],
-        options=[t['all']] + prompts
+        options=prompts,
+        default=prompts,
+        help="여러 프롬프팅 방식을 선택할 수 있습니다"
     )
     
-    if selected_prompt != t['all']:
-        filtered_df = filtered_df[filtered_df['프롬프팅'] == selected_prompt]
+    if selected_prompts:
+        filtered_df = filtered_df[filtered_df['프롬프팅'].isin(selected_prompts)]
     
-    # 세션 필터 (테스트별로 동적으로 변경)
-    if selected_test != t['all']:
-        available_sessions = get_available_sessions(filtered_df, selected_test)
+    # 세션 필터 (선택된 테스트들에 대해 동적으로 변경, multiselect로 변경)
+    if selected_tests:
+        available_sessions = get_available_sessions(filtered_df, selected_tests)
         if available_sessions:
-            selected_session = st.sidebar.selectbox(
+            selected_sessions = st.sidebar.multiselect(
                 t['session'],
-                options=[t['all']] + available_sessions
+                options=available_sessions,
+                default=available_sessions,
+                help="여러 세션을 선택할 수 있습니다"
             )
             
-            if selected_session != t['all']:
+            if selected_sessions:
                 # 선택된 세션과 매칭되는 원본 데이터 필터링
                 filtered_df = filtered_df[filtered_df['Session'].apply(
-                    lambda x: safe_convert_to_int(x) == selected_session if pd.notna(x) else False
+                    lambda x: safe_convert_to_int(x) in selected_sessions if pd.notna(x) else False
                 )]
     
     # 문제 유형 필터
@@ -1725,12 +1737,12 @@ def main():
     with tabs[7]:
         st.header(f"📋 {t['testset_stats']}")
         
-        if selected_test == t['all']:
-            # 모든 테스트의 통계 표시
-            for test_name in test_names:
+        if selected_tests:
+            # 선택된 테스트들의 통계 표시
+            for test_name in selected_tests:
                 stats = get_testset_statistics(testsets, test_name, lang)
                 if stats:
-                    st.subheader(f"{test_name}")
+                    st.subheader(f"📖 {test_name}")
                     
                     col1, col2, col3 = st.columns(3)
                     
@@ -1779,87 +1791,7 @@ def main():
                     
                     st.markdown("---")
         else:
-            # 선택된 테스트의 통계만 표시
-            stats = get_testset_statistics(testsets, selected_test, lang)
-            if stats:
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    st.metric(t['total_problems'], stats['total_problems'])
-                
-                with col2:
-                    if 'law_problems' in stats:
-                        st.metric(t['law_problems'], stats['law_problems'])
-                
-                with col3:
-                    if 'non_law_problems' in stats:
-                        st.metric(t['non_law_problems'], stats['non_law_problems'])
-                
-                st.markdown("---")
-                
-                # 과목별 통계
-                if 'by_subject' in stats:
-                    st.subheader(t['subject_distribution'])
-                    subject_df = pd.DataFrame(list(stats['by_subject'].items()), 
-                                             columns=['Subject', 'Count'])
-                    subject_df = subject_df.sort_values('Count', ascending=False)
-                    
-                    col1, col2 = st.columns([1, 2])
-                    
-                    with col1:
-                        st.dataframe(subject_df, use_container_width=True)
-                    
-                    with col2:
-                        fig = px.bar(subject_df, x='Subject', y='Count', 
-                                   title=t['subject_distribution'],
-                                   text='Count')
-                        fig.update_traces(textposition='outside')
-                        fig.update_xaxes(tickangle=45)
-                        st.plotly_chart(fig, use_container_width=True)
-                
-                st.markdown("---")
-                
-                # 연도별 통계
-                if 'by_year' in stats:
-                    st.subheader(t['year_distribution'])
-                    year_df = pd.DataFrame(list(stats['by_year'].items()), 
-                                          columns=['Year', 'Count'])
-                    year_df = year_df.sort_values('Year')
-                    
-                    col1, col2 = st.columns([1, 2])
-                    
-                    with col1:
-                        st.dataframe(year_df, use_container_width=True)
-                    
-                    with col2:
-                        fig = px.line(year_df, x='Year', y='Count', 
-                                    title=t['year_distribution'],
-                                    markers=True, text='Count')
-                        fig.update_traces(textposition='top center')
-                        st.plotly_chart(fig, use_container_width=True)
-                
-                st.markdown("---")
-                
-                # 세션별 통계
-                if 'by_session' in stats:
-                    st.subheader(t['session_distribution'])
-                    session_df = pd.DataFrame(list(stats['by_session'].items()), 
-                                             columns=['Session', 'Count'])
-                    session_df = session_df.sort_values('Session')
-                    
-                    col1, col2 = st.columns([1, 2])
-                    
-                    with col1:
-                        st.dataframe(session_df, use_container_width=True)
-                    
-                    with col2:
-                        fig = px.bar(session_df, x='Session', y='Count', 
-                                   title=t['session_distribution'],
-                                   text='Count')
-                        fig.update_traces(textposition='outside')
-                        st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info(f"No statistics available for {selected_test}")
+            st.info("테스트를 선택해주세요.")
     
     # 사이드바 하단 정보
     st.sidebar.markdown("---")

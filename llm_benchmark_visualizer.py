@@ -748,8 +748,8 @@ def main():
         with col2:
             st.metric("평가 모델 수", f"{num_models}")
         with col3:
-            # 수정: 총 평가 횟수 = 고유 문제 수 × 모델 수
-            actual_eval_count = unique_questions * num_models
+            # 수정: 총 평가 횟수 = 총 문제 수 × 모델 수
+            actual_eval_count = display_problems * num_models
             st.metric("총 평가 횟수", f"{actual_eval_count:,}")
         
         st.markdown("---")
@@ -763,7 +763,7 @@ def main():
         avg_accuracy = model_accuracies.mean() * 100
         
         # 평균 정답/오답 수 (모델당)
-        avg_problems_per_model = unique_questions  # 모델당 평가한 고유 문제 수
+        avg_problems_per_model = display_problems  # 모델당 평가한 문제 수 (테스트셋 기준)
         avg_correct = (avg_problems_per_model * avg_accuracy / 100) if avg_problems_per_model > 0 else 0
         avg_wrong = avg_problems_per_model - avg_correct
         

@@ -466,16 +466,18 @@ def get_available_sessions(df, test_names):
         sessions_clean = []
         
         for s in sessions_raw:
-            # 문자열이면 그대로 사용
-            if isinstance(s, str):
-                s_clean = s.strip()
-                if s_clean and s_clean not in sessions_clean:
-                    sessions_clean.append(s_clean)
-            # 숫자면 정수로 변환
-            else:
-                s_int = safe_convert_to_int(s)
-                if s_int is not None and s_int not in sessions_clean:
+            # 숫자로 변환 가능한지 먼저 시도
+            s_int = safe_convert_to_int(s)
+            if s_int is not None:
+                # 숫자로 변환 가능하면 정수로 저장
+                if s_int not in sessions_clean:
                     sessions_clean.append(s_int)
+            else:
+                # 숫자로 변환 불가능하면 문자열로 저장
+                if isinstance(s, str):
+                    s_clean = s.strip()
+                    if s_clean and s_clean not in sessions_clean:
+                        sessions_clean.append(s_clean)
         
         # 정렬: 숫자 먼저, 그 다음 문자열
         return sorted(sessions_clean, key=lambda x: (isinstance(x, str), x))
@@ -665,13 +667,20 @@ def main():
                 def match_session(x):
                     if pd.isna(x):
                         return False
-                    # 문자열이면 그대로 비교
+                    
+                    # x를 정수로 변환 시도
+                    x_int = safe_convert_to_int(x)
+                    
+                    # 선택된 세션에 정수로 변환된 값이 있는지 확인
+                    if x_int is not None and x_int in selected_sessions:
+                        return True
+                    
+                    # 문자열로 직접 비교
                     if isinstance(x, str):
-                        return x.strip() in selected_sessions
-                    # 숫자면 정수로 변환하여 비교
-                    else:
-                        x_int = safe_convert_to_int(x)
-                        return x_int in selected_sessions if x_int is not None else False
+                        x_clean = x.strip()
+                        return x_clean in selected_sessions
+                    
+                    return False
                 
                 filtered_df = filtered_df[filtered_df['Session'].apply(match_session)]
     

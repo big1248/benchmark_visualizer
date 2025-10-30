@@ -805,24 +805,33 @@ def main():
         num_models = filtered_df['모델'].nunique()
         
         # 테스트셋 기본 정보
-        st.subheader("📋 테스트셋 정보")
+        st.subheader("📋 " + ("테스트셋 정보" if lang == 'ko' else "Test Set Information"))
         col1, col2, col3 = st.columns(3)
         
         with col1:
             # 테스트셋 파일의 실제 문제 수 사용
             display_problems = total_problems if total_problems > 0 else unique_questions
-            st.metric("총 문제 수", f"{display_problems:,}")
+            st.metric(
+                "총 문제 수" if lang == 'ko' else "Total Problems",
+                f"{display_problems:,}"
+            )
         with col2:
-            st.metric("평가 모델 수", f"{num_models}")
+            st.metric(
+                "평가 모델 수" if lang == 'ko' else "Number of Models",
+                f"{num_models}"
+            )
         with col3:
             # 수정: 총 평가 횟수 = 총 문제 수 × 모델 수
             actual_eval_count = display_problems * num_models
-            st.metric("총 평가 횟수", f"{actual_eval_count:,}")
+            st.metric(
+                "총 평가 횟수" if lang == 'ko' else "Total Evaluations",
+                f"{actual_eval_count:,}"
+            )
         
         st.markdown("---")
         
         # 모델 평균 성능
-        st.subheader("🎯 모델 평균 성능")
+        st.subheader("🎯 " + ("모델 평균 성능" if lang == 'ko' else "Average Model Performance"))
         col1, col2, col3, col4 = st.columns(4)
         
         # 모델별 정확도 계산 후 평균
@@ -835,18 +844,30 @@ def main():
         avg_wrong = avg_problems_per_model - avg_correct
         
         with col1:
-            st.metric("평균 정확도", f"{avg_accuracy:.2f}%")
+            st.metric(
+                "평균 정확도" if lang == 'ko' else "Average Accuracy",
+                f"{avg_accuracy:.2f}%"
+            )
         with col2:
-            st.metric("모델당 평균 문제 수", f"{avg_problems_per_model:.0f}")
+            st.metric(
+                "모델당 평균 문제 수" if lang == 'ko' else "Avg Problems per Model",
+                f"{avg_problems_per_model:.0f}"
+            )
         with col3:
-            st.metric("평균 정답 수", f"{avg_correct:.0f}")
+            st.metric(
+                "평균 정답 수" if lang == 'ko' else "Avg Correct Answers",
+                f"{avg_correct:.0f}"
+            )
         with col4:
-            st.metric("평균 오답 수", f"{avg_wrong:.0f}")
+            st.metric(
+                "평균 오답 수" if lang == 'ko' else "Avg Wrong Answers",
+                f"{avg_wrong:.0f}"
+            )
         
         # 법령/비법령 통계
         if 'law' in filtered_df.columns:
             st.markdown("---")
-            st.subheader("⚖️ 법령/비법령 분석")
+            st.subheader("⚖️ " + ("법령/비법령 분석" if lang == 'ko' else "Law/Non-Law Analysis"))
             
             # 테스트셋 기반으로 법령/비법령 문제 수 계산
             law_count_testset = 0
@@ -888,7 +909,7 @@ def main():
         
         # 시각화 차트 추가
         st.markdown("---")
-        st.subheader("📊 주요 지표 시각화")
+        st.subheader("📊 " + ("주요 지표 시각화" if lang == 'ko' else "Key Metrics Visualization"))
         
         col1, col2 = st.columns(2)
         
@@ -927,25 +948,27 @@ def main():
             # 법령/비법령 정답률 비교 차트
             if 'law' in filtered_df.columns:
                 law_comparison = pd.DataFrame({
-                    '구분': ['법령', '비법령'],
+                    '구분': [t['law'], t['non_law']],
                     '정답률': [law_accuracy, non_law_accuracy],
                     '문제수': [law_count, non_law_count]
                 })
                 
                 fig = go.Figure()
                 fig.add_trace(go.Bar(
-                    name='정답률',
+                    name=t['correct_rate'] if lang == 'ko' else 'Accuracy',
                     x=law_comparison['구분'],
                     y=law_comparison['정답률'],
                     text=law_comparison['정답률'].round(1),
                     texttemplate='%{text}%',
                     textposition='outside',
                     marker_color=['#FF6B6B', '#4ECDC4'],
+                    marker_line_color='black',
+                    marker_line_width=1.5,
                     yaxis='y'
                 ))
                 
                 fig.add_trace(go.Scatter(
-                    name='문제 수',
+                    name=t['problem_count'] if lang == 'ko' else 'Problem Count',
                     x=law_comparison['구분'],
                     y=law_comparison['문제수'],
                     text=law_comparison['문제수'],
@@ -958,14 +981,14 @@ def main():
                 ))
                 
                 fig.update_layout(
-                    title='법령/비법령 정답률 및 문제 수 비교',
+                    title='법령/비법령 정답률 및 문제 수 비교' if lang == 'ko' else 'Law/Non-Law Accuracy and Problem Count Comparison',
                     height=400,
                     yaxis=dict(
-                        title='정답률 (%)',
+                        title=('정답률 (%)' if lang == 'ko' else 'Accuracy (%)'),
                         range=[0, 100]
                     ),
                     yaxis2=dict(
-                        title='문제 수',
+                        title=(t['problem_count'] if lang == 'ko' else 'Problem Count'),
                         overlaying='y',
                         side='right',
                         range=[0, max(law_count, non_law_count) * 1.2]

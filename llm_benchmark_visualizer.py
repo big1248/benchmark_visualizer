@@ -1281,17 +1281,31 @@ def main():
             subject_stats = filtered_df.groupby('Subject').agg({
                 '정답여부': ['sum', 'count', 'mean']
             }).reset_index()
-            subject_stats.columns = ['과목', '정답', '총문제', '정확도']
-            subject_stats['정확도'] = subject_stats['정확도'] * 100
-            subject_stats = subject_stats.sort_values('정확도', ascending=False)
+            
+            # 컬럼명 언어별 설정
+            if lang == 'ko':
+                subject_stats.columns = ['과목', '정답', '총문제', '정확도']
+                subj_col = '과목'
+                acc_col = '정확도'
+                correct_col = '정답'
+                total_col = '총문제'
+            else:
+                subject_stats.columns = ['Subject', 'Correct', 'Total', 'Accuracy']
+                subj_col = 'Subject'
+                acc_col = 'Accuracy'
+                correct_col = 'Correct'
+                total_col = 'Total'
+            
+            subject_stats[acc_col] = subject_stats[acc_col] * 100
+            subject_stats = subject_stats.sort_values(acc_col, ascending=False)
             
             col1, col2 = st.columns([1, 2])
             
             with col1:
                 # 테이블
                 st.dataframe(
-                    subject_stats.style.format({'정확도': '{:.2f}%'})
-                    .background_gradient(subset=['정확도'], cmap='RdYlGn'),
+                    subject_stats.style.format({acc_col: '{:.2f}%'})
+                    .background_gradient(subset=[acc_col], cmap='RdYlGn'),
                     use_container_width=True
                 )
             
@@ -1299,23 +1313,25 @@ def main():
                 # 바 차트
                 fig = px.bar(
                     subject_stats,
-                    x='과목',
-                    y='정확도',
+                    x=subj_col,
+                    y=acc_col,
                     title=t['subject_performance'],
-                    text='정확도',
-                    color='정확도',
-                    color_continuous_scale='RdYlGn'
+                    text=acc_col,
+                    color=acc_col,
+                    color_continuous_scale='RdYlGn',
+                    labels={subj_col: t['by_subject'].replace('별', ''), acc_col: t['accuracy'] + ' (%)'}
                 )
                 fig.update_traces(
-                texttemplate='%{text:.1f}%',
-                textposition='outside',
-                marker_line_color='black',
-                marker_line_width=1.5
-            )
+                    texttemplate='%{text:.1f}%',
+                    textposition='outside',
+                    marker_line_color='black',
+                    marker_line_width=1.5
+                )
                 fig.update_layout(
                     height=400,
                     showlegend=False,
-                    yaxis_title=t['accuracy'] + ' (%)'
+                    yaxis_title=t['accuracy'] + ' (%)',
+                    xaxis_title=t['by_subject'].replace('별', '')
                 )
                 fig.update_xaxes(tickangle=45)
                 st.plotly_chart(fig, use_container_width=True)
@@ -1786,7 +1802,7 @@ def main():
         analysis_df['난이도_구간'] = pd.Categorical(analysis_df['난이도_구간'], categories=difficulty_order, ordered=True)
         
         # 1. 난이도 분포
-        st.subheader("📈 문제 난이도 분포")
+        st.subheader("📈 " + (t['problem_distribution'] if 'problem_distribution' in t else ('문제 난이도 분포' if lang == 'ko' else 'Problem Difficulty Distribution')))
         
         col1, col2 = st.columns(2)
         
@@ -1815,10 +1831,17 @@ def main():
             fig = px.bar(
                 x=difficulty_dist.index,
                 y=difficulty_dist.values,
-                title=t['problem_count'] + ' by Difficulty',
-                labels={'x': 'Difficulty', 'y': t['problem_count']},
+                title=t['problem_count'] + (' by ' + t['difficulty_range'] if lang == 'en' else ' (' + t['difficulty_range'] + '별)'),
+                labels={'x': t['difficulty_range'], 'y': t['problem_count']},
+                text=difficulty_dist.values,
                 color=difficulty_dist.values,
                 color_continuous_scale='RdYlGn_r'
+            )
+            fig.update_traces(
+                texttemplate='%{text}',
+                textposition='outside',
+                marker_line_color='black',
+                marker_line_width=1.5
             )
             fig.update_layout(
                 height=400,
@@ -1857,25 +1880,40 @@ def main():
         st.markdown("---")
         
         # 2. 난이도별 모델 성능
-        st.subheader("🎯 난이도별 모델 성능")
+        st.subheader("🎯 " + ('난이도별 모델 성능' if lang == 'ko' else 'Model Performance by Difficulty Level'))
         
         # 모델별 난이도 구간별 정답률
         model_difficulty = analysis_df.groupby(['모델', '난이도_구간']).agg({
             '정답여부': ['mean', 'count']
         }).reset_index()
-        model_difficulty.columns = ['모델', '난이도_구간', '정답률', '문제수']
-        model_difficulty['정답률'] = model_difficulty['정답률'] * 100
+        
+        # 컬럼명 언어별 설정
+        if lang == 'ko':
+            model_difficulty.columns = ['모델', '난이도_구간', '정답률', '문제수']
+        else:
+            model_difficulty.columns = ['Model', 'Difficulty', 'Correct Rate', 'Problem Count']
+        
+        # 정답률 컬럼명 (언어별)
+        acc_col = '정답률' if lang == 'ko' else 'Correct Rate'
+        model_col = '모델' if lang == 'ko' else 'Model'
+        diff_col = '난이도_구간' if lang == 'ko' else 'Difficulty'
+        
+        model_difficulty[acc_col] = model_difficulty[acc_col] * 100
         
         # 라인 차트
         fig = px.line(
             model_difficulty,
-            x='난이도_구간',
-            y='정답률',
-            color='모델',
+            x=diff_col,
+            y=acc_col,
+            color=model_col,
             markers=True,
-            title='난이도별 모델 성능 비교',
-            labels={'정답률': t['accuracy'] + ' (%)', '난이도_구간': 'Difficulty Level'},
-            category_orders={'난이도_구간': difficulty_order}
+            title='난이도별 모델 성능 비교' if lang == 'ko' else 'Model Performance by Difficulty Level',
+            labels={
+                acc_col: t['accuracy'] + ' (%)',
+                diff_col: t['difficulty_range'],
+                model_col: t['model']
+            },
+            category_orders={diff_col: difficulty_order}
         )
         fig.update_traces(
             marker_size=10,
@@ -1889,9 +1927,9 @@ def main():
         
         # 히트맵
         pivot_difficulty = model_difficulty.pivot(
-            index='모델',
-            columns='난이도_구간',
-            values='정답률'
+            index=model_col,
+            columns=diff_col,
+            values=acc_col
         )
         
         # 난이도 순서대로 컬럼 재정렬
@@ -1911,8 +1949,8 @@ def main():
         ))
         fig.update_layout(
             height=400,
-            title='모델 × 난이도 히트맵',
-            xaxis_title='난이도 구간',
+            title='모델 × 난이도 히트맵' if lang == 'ko' else 'Model × Difficulty Heatmap',
+            xaxis_title=t['difficulty_range'],
             yaxis_title=t['model']
         )
         fig.update_xaxes(tickangle=45)
@@ -1922,23 +1960,34 @@ def main():
         
         # 3. 과목별 난이도 분석
         if 'Subject' in analysis_df.columns:
-            st.subheader("📚 과목별 난이도 분석")
+            st.subheader("📚 " + ('과목별 난이도 분석' if lang == 'ko' else 'Difficulty Analysis by Subject'))
             
             subject_difficulty = analysis_df.groupby('Subject').agg({
                 'difficulty_score': 'mean',
                 'Question': 'count'
             }).reset_index()
-            subject_difficulty.columns = ['과목', '평균_난이도', '문제수']
-            subject_difficulty = subject_difficulty.sort_values('평균_난이도')
+            
+            # 컬럼명 언어별 설정
+            if lang == 'ko':
+                subject_difficulty.columns = ['과목', '평균_난이도', '문제수']
+                subj_col = '과목'
+                avg_diff_col = '평균_난이도'
+            else:
+                subject_difficulty.columns = ['Subject', 'Avg Difficulty', 'Problem Count']
+                subj_col = 'Subject'
+                avg_diff_col = 'Avg Difficulty'
+            
+            subject_difficulty = subject_difficulty.sort_values(avg_diff_col)
             
             fig = px.bar(
                 subject_difficulty,
-                x='과목',
-                y='평균_난이도',
-                title='과목별 평균 난이도 (정답률)',
-                text='평균_난이도',
-                color='평균_난이도',
-                color_continuous_scale='RdYlGn'
+                x=subj_col,
+                y=avg_diff_col,
+                title='과목별 평균 난이도 (정답률)' if lang == 'ko' else 'Average Difficulty by Subject (Correct Rate)',
+                text=avg_diff_col,
+                color=avg_diff_col,
+                color_continuous_scale='RdYlGn',
+                labels={subj_col: t['by_subject'].replace('별', ''), avg_diff_col: t['avg_difficulty']}
             )
             fig.update_traces(
                 texttemplate='%{text:.1f}%',
@@ -1972,11 +2021,16 @@ def main():
                 text=pivot_subject_diff.values.astype(int),
                 texttemplate='%{text}',
                 textfont={"size": 10},
-                colorbar=dict(title="문제 수"),
+                colorbar=dict(title=t['problem_count']),
                 xgap=2,  # 셀 경계선
                 ygap=2
             ))
-            fig.update_layout(height=500)
+            fig.update_layout(
+                height=500,
+                title='과목 × 난이도 분포' if lang == 'ko' else 'Subject × Difficulty Distribution',
+                xaxis_title=t['difficulty_range'],
+                yaxis_title=t['by_subject'].replace('별', '')  # '과목' or 'Subject'
+            )
             fig.update_xaxes(tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
         
@@ -2055,9 +2109,9 @@ def main():
         st.subheader("📋 " + t['difficulty_stats_by_range'])
         
         detailed_difficulty = model_difficulty.pivot_table(
-            index='모델',
-            columns='난이도_구간',
-            values='정답률',
+            index=model_col,
+            columns=diff_col,
+            values=acc_col,
             aggfunc='mean'
         ).round(2)
         

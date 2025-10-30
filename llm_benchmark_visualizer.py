@@ -434,11 +434,17 @@ def load_data(data_dir):
     return testsets, results_df
 
 def safe_convert_to_int(value):
-    """안전하게 값을 정수로 변환"""
+    """안전하게 값을 정수로 변환 - 쉼표 구분자 처리 개선"""
     try:
-        # 문자열인 경우 쉼표 제거
+        # None이나 NaN 처리
+        if pd.isna(value):
+            return None
+            
+        # 문자열인 경우 쉼표 제거 (천 단위 구분자)
         if isinstance(value, str):
-            value = value.replace(',', '.')
+            # 쉼표는 천 단위 구분자이므로 그냥 제거
+            value = value.replace(',', '')
+        
         # float로 변환 후 int로 변환
         return int(float(value))
     except (ValueError, TypeError):
@@ -742,7 +748,9 @@ def main():
         with col2:
             st.metric("평가 모델 수", f"{num_models}")
         with col3:
-            st.metric("총 평가 횟수", f"{len(filtered_df):,}")
+            # 수정: 총 평가 횟수 = 고유 문제 수 × 모델 수
+            actual_eval_count = unique_questions * num_models
+            st.metric("총 평가 횟수", f"{actual_eval_count:,}")
         
         st.markdown("---")
         
@@ -755,7 +763,7 @@ def main():
         avg_accuracy = model_accuracies.mean() * 100
         
         # 평균 정답/오답 수 (모델당)
-        avg_problems_per_model = len(filtered_df) / num_models if num_models > 0 else 0
+        avg_problems_per_model = unique_questions  # 모델당 평가한 고유 문제 수
         avg_correct = (avg_problems_per_model * avg_accuracy / 100) if avg_problems_per_model > 0 else 0
         avg_wrong = avg_problems_per_model - avg_correct
         

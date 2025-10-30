@@ -908,7 +908,12 @@ def main():
                 color=t['accuracy'],
                 color_continuous_scale='RdYlGn'
             )
-            fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
+            fig.update_traces(
+                texttemplate='%{text:.1f}%',
+                textposition='outside',
+                marker_line_color='black',
+                marker_line_width=1.5
+            )
             fig.update_layout(
                 height=400,
                 showlegend=False,
@@ -1051,7 +1056,12 @@ def main():
                     color='정확도',
                     color_continuous_scale='RdYlGn'
                 )
-                fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
+                fig.update_traces(
+                texttemplate='%{text:.1f}%',
+                textposition='outside',
+                marker_line_color='black',
+                marker_line_width=1.5
+            )
                 fig.update_layout(
                     height=400,
                     showlegend=False,
@@ -1107,7 +1117,12 @@ def main():
                 color='정확도',
                 color_continuous_scale='RdYlGn'
             )
-            fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
+            fig.update_traces(
+                texttemplate='%{text:.1f}%',
+                textposition='outside',
+                marker_line_color='black',
+                marker_line_width=1.5
+            )
             fig.update_layout(
                 height=400,
                 showlegend=False,
@@ -1123,13 +1138,17 @@ def main():
                 name=t['correct'],
                 x=model_stats['모델'],
                 y=model_stats['정답'],
-                marker_color='lightgreen'
+                marker_color='lightgreen',
+                marker_line_color='black',
+                marker_line_width=1.5
             ))
             fig.add_trace(go.Bar(
                 name=t['wrong'],
                 x=model_stats['모델'],
                 y=model_stats['오답'],
-                marker_color='lightcoral'
+                marker_color='lightcoral',
+                marker_line_color='black',
+                marker_line_width=1.5
             ))
             
             fig.update_layout(
@@ -1150,16 +1169,19 @@ def main():
             heatmap_data = filtered_df.groupby(['모델', '테스트명'])['정답여부'].mean() * 100
             heatmap_pivot = heatmap_data.unstack(fill_value=0)
             
-            # 히트맵 생성 (숫자 표시 추가)
-            fig = px.imshow(
-                heatmap_pivot,
-                labels=dict(x=t['testname'], y=t['model'], color=t['accuracy'] + " (%)"),
+            # 히트맵 생성 (숫자 표시 및 셀 경계선 추가)
+            fig = go.Figure(data=go.Heatmap(
+                z=heatmap_pivot.values,
                 x=heatmap_pivot.columns,
                 y=heatmap_pivot.index,
-                color_continuous_scale='RdYlGn',
-                aspect="auto",
-                text_auto='.1f'  # 숫자 표시 추가
-            )
+                colorscale='RdYlGn',
+                text=np.round(heatmap_pivot.values, 1),
+                texttemplate='%{text:.1f}',
+                textfont={"size": 10},
+                colorbar=dict(title=t['accuracy'] + " (%)"),
+                xgap=2,  # 셀 경계선
+                ygap=2
+            ))
             
             fig.update_layout(height=400)
             fig.update_xaxes(tickangle=45)
@@ -1188,7 +1210,8 @@ def main():
                 fig = go.Figure(data=[go.Pie(
                     labels=[t['law'], t['non_law']],
                     values=[law_count, non_law_count],
-                    hole=0.3
+                    hole=0.3,
+                    marker=dict(line=dict(color='black', width=2))
                 )])
                 fig.update_layout(
                     title=t['law_distribution_stat'],
@@ -1283,7 +1306,12 @@ def main():
                     color='정확도',
                     color_continuous_scale='RdYlGn'
                 )
-                fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
+                fig.update_traces(
+                texttemplate='%{text:.1f}%',
+                textposition='outside',
+                marker_line_color='black',
+                marker_line_width=1.5
+            )
                 fig.update_layout(
                     height=400,
                     showlegend=False,
@@ -1292,20 +1320,23 @@ def main():
                 fig.update_xaxes(tickangle=45)
                 st.plotly_chart(fig, use_container_width=True)
             
-            # 모델별 과목 성능 히트맵
+            # 모델별 과목 성능 히트맵 (셀 경계선 추가)
             st.markdown("---")
             subject_model = filtered_df.groupby(['모델', 'Subject'])['정답여부'].mean() * 100
             subject_model_pivot = subject_model.unstack(fill_value=0)
             
-            fig = px.imshow(
-                subject_model_pivot,
-                labels=dict(x=t['by_subject'], y=t['model'], color=t['accuracy'] + " (%)"),
+            fig = go.Figure(data=go.Heatmap(
+                z=subject_model_pivot.values,
                 x=subject_model_pivot.columns,
                 y=subject_model_pivot.index,
-                color_continuous_scale='RdYlGn',
-                aspect="auto",
-                text_auto='.1f'  # 숫자 표시 추가
-            )
+                colorscale='RdYlGn',
+                text=np.round(subject_model_pivot.values, 1),
+                texttemplate='%{text:.1f}',
+                textfont={"size": 10},
+                colorbar=dict(title=t['accuracy'] + " (%)"),
+                xgap=2,  # 셀 경계선
+                ygap=2
+            ))
             fig.update_layout(height=400)
             fig.update_xaxes(tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
@@ -1373,7 +1404,14 @@ def main():
                         markers=True,
                         text='정확도'
                     )
-                    fig.update_traces(texttemplate='%{text:.1f}%', textposition='top center')
+                    fig.update_traces(
+                        texttemplate='%{text:.1f}%',
+                        textposition='top center',
+                        marker_size=10,
+                        marker_line_color='black',
+                        marker_line_width=2,
+                        line_width=3
+                    )
                     fig.update_layout(
                         height=400,
                         yaxis_title=t['accuracy'] + ' (%)',
@@ -1444,7 +1482,12 @@ def main():
                         color=count_col,
                         color_continuous_scale='Blues'
                     )
-                    fig.update_traces(texttemplate='%{text}', textposition='outside')
+                    fig.update_traces(
+                texttemplate='%{text}',
+                textposition='outside',
+                marker_line_color='black',
+                marker_line_width=1.5
+            )
                     fig.update_layout(
                         height=400,
                         showlegend=False,
@@ -1462,15 +1505,18 @@ def main():
                 # 컬럼명을 정수로 변환
                 year_model_pivot.columns = year_model_pivot.columns.astype(int)
                 
-                fig = px.imshow(
-                    year_model_pivot,
-                    labels=dict(x=t['year'], y=t['model'], color=t['accuracy'] + " (%)"),
+                fig = go.Figure(data=go.Heatmap(
+                    z=year_model_pivot.values,
                     x=year_model_pivot.columns,
                     y=year_model_pivot.index,
-                    color_continuous_scale='RdYlGn',
-                    aspect="auto",
-                    text_auto='.1f'  # 숫자 표시 추가
-                )
+                    colorscale='RdYlGn',
+                    text=np.round(year_model_pivot.values, 1),
+                    texttemplate='%{text:.1f}',
+                    textfont={"size": 10},
+                    colorbar=dict(title=t['accuracy'] + " (%)"),
+                    xgap=2,  # 셀 경계선
+                    ygap=2
+                ))
                 fig.update_layout(height=400)
                 st.plotly_chart(fig, use_container_width=True)
             else:
@@ -1753,6 +1799,10 @@ def main():
                 title=t['difficulty_score'] + ' Distribution',
                 labels={'difficulty_score': t['difficulty_score'], 'count': t['problem_count']}
             )
+            fig.update_traces(
+                marker_line_color='black',
+                marker_line_width=1.5
+            )
             fig.update_layout(height=400)
             st.plotly_chart(fig, use_container_width=True)
         
@@ -1827,6 +1877,12 @@ def main():
             labels={'정답률': t['accuracy'] + ' (%)', '난이도_구간': 'Difficulty Level'},
             category_orders={'난이도_구간': difficulty_order}
         )
+        fig.update_traces(
+            marker_size=10,
+            marker_line_color='black',
+            marker_line_width=2,
+            line_width=3
+        )
         fig.update_layout(height=500)
         fig.update_xaxes(tickangle=45)
         st.plotly_chart(fig, use_container_width=True)
@@ -1841,17 +1897,24 @@ def main():
         # 난이도 순서대로 컬럼 재정렬
         pivot_difficulty = pivot_difficulty.reindex(columns=difficulty_order)
         
-        fig = px.imshow(
-            pivot_difficulty,
-            labels=dict(x="난이도 구간", y=t['model'], color=t['accuracy'] + " (%)"),
+        fig = go.Figure(data=go.Heatmap(
+            z=pivot_difficulty.values,
             x=pivot_difficulty.columns,
             y=pivot_difficulty.index,
-            color_continuous_scale='RdYlGn',
-            aspect="auto",
+            colorscale='RdYlGn',
+            text=np.round(pivot_difficulty.values, 1),
+            texttemplate='%{text:.1f}',
+            textfont={"size": 10},
+            colorbar=dict(title=t['accuracy'] + " (%)"),
+            xgap=2,  # 셀 경계선
+            ygap=2
+        ))
+        fig.update_layout(
+            height=400,
             title='모델 × 난이도 히트맵',
-            text_auto='.1f'  # 숫자 표시
+            xaxis_title='난이도 구간',
+            yaxis_title=t['model']
         )
-        fig.update_layout(height=400)
         fig.update_xaxes(tickangle=45)
         st.plotly_chart(fig, use_container_width=True)
         
@@ -1877,7 +1940,12 @@ def main():
                 color='평균_난이도',
                 color_continuous_scale='RdYlGn'
             )
-            fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
+            fig.update_traces(
+                texttemplate='%{text:.1f}%',
+                textposition='outside',
+                marker_line_color='black',
+                marker_line_width=1.5
+            )
             fig.update_xaxes(tickangle=45)
             fig.update_layout(
                 height=500,
@@ -1896,16 +1964,18 @@ def main():
             # 난이도 순서대로 컬럼 재정렬
             pivot_subject_diff = pivot_subject_diff.reindex(columns=difficulty_order, fill_value=0)
             
-            fig = px.imshow(
-                pivot_subject_diff,
-                labels=dict(x="난이도 구간", y="과목", color="문제 수"),
+            fig = go.Figure(data=go.Heatmap(
+                z=pivot_subject_diff.values,
                 x=pivot_subject_diff.columns,
                 y=pivot_subject_diff.index,
-                color_continuous_scale='Blues',
-                aspect="auto",
-                title='과목 × 난이도 분포',
-                text_auto=True  # 숫자 표시
-            )
+                colorscale='Blues',
+                text=pivot_subject_diff.values.astype(int),
+                texttemplate='%{text}',
+                textfont={"size": 10},
+                colorbar=dict(title="문제 수"),
+                xgap=2,  # 셀 경계선
+                ygap=2
+            ))
             fig.update_layout(height=500)
             fig.update_xaxes(tickangle=45)
             st.plotly_chart(fig, use_container_width=True)

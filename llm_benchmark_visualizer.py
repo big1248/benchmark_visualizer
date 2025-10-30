@@ -148,6 +148,22 @@ LANGUAGES = {
         'law_analysis_desc': '법령/비법령 구분 분석',
         'detail_analysis': '과목별, 연도별 상세 분석',
         'font_size': '폰트 크기',
+        'year_problem_distribution': '연도별 문제 수 분포',
+        'problem_count_table': '연도별 문제 수 테이블',
+        'year_problem_chart': '연도별 문제 수',
+        'total_problem_count': '총 문제 수',
+        'correct_models': '정답 모델',
+        'incorrect_models': '오답 모델',
+        'avg_accuracy_by_model': '모델별 평균 정확도',
+        'difficulty_range': '난이도 구간',
+        'avg_difficulty': '평균 난이도',
+        'difficulty_stats_by_range': '난이도 구간별 상세 통계',
+        'very_hard': '매우 어려움',
+        'hard': '어려움',
+        'medium': '보통',
+        'easy': '쉬움',
+        'very_easy': '매우 쉬운',
+        'problem_distribution': '문제 분포',
     },
     'en': {
         'title': 'LLM Benchmark Results Visualization Tool',
@@ -224,6 +240,22 @@ LANGUAGES = {
         'law_analysis_desc': 'Analyze law/non-law distinction',
         'detail_analysis': 'Detailed analysis by subject and year',
         'font_size': 'Font Size',
+        'year_problem_distribution': 'Problem Distribution by Year',
+        'problem_count_table': 'Problem Count by Year',
+        'year_problem_chart': 'Problems by Year',
+        'total_problem_count': 'Total Problems',
+        'correct_models': 'Correct Models',
+        'incorrect_models': 'Incorrect Models',
+        'avg_accuracy_by_model': 'Average Accuracy by Model',
+        'difficulty_range': 'Difficulty Range',
+        'avg_difficulty': 'Average Difficulty',
+        'difficulty_stats_by_range': 'Detailed Statistics by Difficulty Range',
+        'very_hard': 'Very Hard',
+        'hard': 'Hard',
+        'medium': 'Medium',
+        'easy': 'Easy',
+        'very_easy': 'Very Easy',
+        'problem_distribution': 'Problem Distribution',
     }
 }
 
@@ -863,25 +895,25 @@ def main():
         with col1:
             # 모델별 평균 정확도 바 차트
             model_acc_df = filtered_df.groupby('모델')['정답여부'].mean().reset_index()
-            model_acc_df.columns = ['모델', '정확도']
-            model_acc_df['정확도'] = model_acc_df['정확도'] * 100
-            model_acc_df = model_acc_df.sort_values('정확도', ascending=False)
+            model_acc_df.columns = [t['model'], t['accuracy']]
+            model_acc_df[t['accuracy']] = model_acc_df[t['accuracy']] * 100
+            model_acc_df = model_acc_df.sort_values(t['accuracy'], ascending=False)
             
             fig = px.bar(
                 model_acc_df,
-                x='모델',
-                y='정확도',
-                title='모델별 평균 정확도',
-                text='정확도',
-                color='정확도',
+                x=t['model'],
+                y=t['accuracy'],
+                title=t['avg_accuracy_by_model'],
+                text=t['accuracy'],
+                color=t['accuracy'],
                 color_continuous_scale='RdYlGn'
             )
             fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
             fig.update_layout(
                 height=400,
                 showlegend=False,
-                yaxis_title='정확도 (%)',
-                xaxis_title='모델',
+                yaxis_title=t['accuracy'] + ' (%)',
+                xaxis_title=t['model'],
                 yaxis=dict(range=[0, 100])
             )
             st.plotly_chart(fig, use_container_width=True)
@@ -1351,7 +1383,11 @@ def main():
                 
                 # 연도별 문제 수 차트 추가
                 st.markdown("---")
-                st.subheader("📊 연도별 문제 수 분포")
+                st.subheader(f"📊 {t['year_problem_distribution']}")
+                
+                # 다국어 컬럼명 설정
+                year_col = t['year']
+                count_col = t['problem_count']
                 
                 # 테스트셋에서 실제 문제 수 계산 (중복 제거)
                 if selected_tests:
@@ -1362,24 +1398,24 @@ def main():
                             for year, count in test_year_counts.items():
                                 year_int = safe_convert_to_int(year)
                                 if year_int:
-                                    year_problem_count.append({'연도': year_int, '문제수': count})
+                                    year_problem_count.append({year_col: year_int, count_col: count})
                     
                     if year_problem_count:
                         year_problem_df = pd.DataFrame(year_problem_count)
-                        year_problem_df = year_problem_df.groupby('연도')['문제수'].sum().reset_index()
-                        year_problem_df = year_problem_df.sort_values('연도')
+                        year_problem_df = year_problem_df.groupby(year_col)[count_col].sum().reset_index()
+                        year_problem_df = year_problem_df.sort_values(year_col)
                     else:
                         # 백업: filtered_df에서 고유 문제 수 계산
                         year_problem_df = year_df.groupby('Year_Int')['Question'].nunique().reset_index()
-                        year_problem_df.columns = ['연도', '문제수']
-                        year_problem_df['연도'] = year_problem_df['연도'].astype(int)
-                        year_problem_df = year_problem_df.sort_values('연도')
+                        year_problem_df.columns = [year_col, count_col]
+                        year_problem_df[year_col] = year_problem_df[year_col].astype(int)
+                        year_problem_df = year_problem_df.sort_values(year_col)
                 else:
                     # 테스트 선택 안 됨: filtered_df에서 계산
                     year_problem_df = year_df.groupby('Year_Int')['Question'].nunique().reset_index()
-                    year_problem_df.columns = ['연도', '문제수']
-                    year_problem_df['연도'] = year_problem_df['연도'].astype(int)
-                    year_problem_df = year_problem_df.sort_values('연도')
+                    year_problem_df.columns = [year_col, count_col]
+                    year_problem_df[year_col] = year_problem_df[year_col].astype(int)
+                    year_problem_df = year_problem_df.sort_values(year_col)
                 
                 col1, col2 = st.columns([1, 2])
                 
@@ -1387,33 +1423,33 @@ def main():
                     # 연도별 문제 수 테이블
                     st.dataframe(
                         year_problem_df.style.format({
-                            '연도': '{:.0f}',
-                            '문제수': '{:.0f}'
+                            year_col: '{:.0f}',
+                            count_col: '{:.0f}'
                         })
-                        .background_gradient(subset=['문제수'], cmap='Blues'),
+                        .background_gradient(subset=[count_col], cmap='Blues'),
                         use_container_width=True
                     )
                     
                     # 총 문제 수 표시
-                    st.metric("총 문제 수", f"{year_problem_df['문제수'].sum():,.0f}개")
+                    st.metric(t['total_problem_count'], f"{year_problem_df[count_col].sum():,.0f}" + (t['problems'] if lang == 'ko' else ''))
                 
                 with col2:
                     # 바 차트
                     fig = px.bar(
                         year_problem_df,
-                        x='연도',
-                        y='문제수',
-                        title='연도별 문제 수',
-                        text='문제수',
-                        color='문제수',
+                        x=year_col,
+                        y=count_col,
+                        title=t['year_problem_chart'],
+                        text=count_col,
+                        color=count_col,
                         color_continuous_scale='Blues'
                     )
                     fig.update_traces(texttemplate='%{text}', textposition='outside')
                     fig.update_layout(
                         height=400,
                         showlegend=False,
-                        yaxis_title='문제 수',
-                        xaxis_title='연도',
+                        yaxis_title=t['problem_count'],
+                        xaxis_title=t['year'],
                         xaxis=dict(tickmode='linear')
                     )
                     st.plotly_chart(fig, use_container_width=True)
@@ -1652,28 +1688,49 @@ def main():
         difficulty['difficulty_score'] = difficulty['difficulty_score'] * 100
         
         # 난이도 구간 분류
-        def classify_difficulty(score):
-            if score < 20:
-                return '매우 어려움 (0-20%)'
-            elif score < 40:
-                return '어려움 (20-40%)'
-            elif score < 60:
-                return '보통 (40-60%)'
-            elif score < 80:
-                return '쉬움 (60-80%)'
-            else:
-                return '매우 쉬움 (80-100%)'
+        def classify_difficulty(score, lang='ko'):
+            if lang == 'ko':
+                if score < 20:
+                    return '매우 어려움 (0-20%)'
+                elif score < 40:
+                    return '어려움 (20-40%)'
+                elif score < 60:
+                    return '보통 (40-60%)'
+                elif score < 80:
+                    return '쉬움 (60-80%)'
+                else:
+                    return '매우 쉬움 (80-100%)'
+            else:  # English
+                if score < 20:
+                    return 'Very Hard (0-20%)'
+                elif score < 40:
+                    return 'Hard (20-40%)'
+                elif score < 60:
+                    return 'Medium (40-60%)'
+                elif score < 80:
+                    return 'Easy (60-80%)'
+                else:
+                    return 'Very Easy (80-100%)'
         
-        difficulty['난이도_구간'] = difficulty['difficulty_score'].apply(classify_difficulty)
+        difficulty['난이도_구간'] = difficulty['difficulty_score'].apply(lambda x: classify_difficulty(x, lang))
         
         # 난이도 구간 순서 정의 (어려운 것부터 쉬운 것 순)
-        difficulty_order = [
-            '매우 어려움 (0-20%)',
-            '어려움 (20-40%)',
-            '보통 (40-60%)',
-            '쉬움 (60-80%)',
-            '매우 쉬움 (80-100%)'
-        ]
+        if lang == 'ko':
+            difficulty_order = [
+                '매우 어려움 (0-20%)',
+                '어려움 (20-40%)',
+                '보통 (40-60%)',
+                '쉬움 (60-80%)',
+                '매우 쉬움 (80-100%)'
+            ]
+        else:
+            difficulty_order = [
+                'Very Hard (0-20%)',
+                'Hard (20-40%)',
+                'Medium (40-60%)',
+                'Easy (60-80%)',
+                'Very Easy (80-100%)'
+            ]
         difficulty['난이도_구간'] = pd.Categorical(difficulty['난이도_구간'], categories=difficulty_order, ordered=True)
         
         # 원본 데이터에 난이도 정보 병합
@@ -1723,15 +1780,29 @@ def main():
         # 통계 요약
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("평균 정답률", f"{difficulty['difficulty_score'].mean():.1f}%")
+            st.metric(
+                t['correct_rate'] if lang == 'ko' else 'Average Correct Rate',
+                f"{difficulty['difficulty_score'].mean():.1f}%"
+            )
         with col2:
-            st.metric("중앙값", f"{difficulty['difficulty_score'].median():.1f}%")
+            st.metric(
+                '중앙값' if lang == 'ko' else 'Median',
+                f"{difficulty['difficulty_score'].median():.1f}%"
+            )
         with col3:
-            very_hard = len(difficulty[difficulty['난이도_구간'] == '매우 어려움 (0-20%)'])
-            st.metric("매우 어려운 문제", f"{very_hard}개")
+            very_hard_label = difficulty_order[0]
+            very_hard = len(difficulty[difficulty['난이도_구간'] == very_hard_label])
+            st.metric(
+                t['very_hard'] + (' 문제' if lang == 'ko' else ' Problems'),
+                f"{very_hard}" + (t['problems'] if lang == 'ko' else '')
+            )
         with col4:
-            very_easy = len(difficulty[difficulty['난이도_구간'] == '매우 쉬움 (80-100%)'])
-            st.metric("매우 쉬운 문제", f"{very_easy}개")
+            very_easy_label = difficulty_order[-1]
+            very_easy = len(difficulty[difficulty['난이도_구간'] == very_easy_label])
+            st.metric(
+                t['very_easy'] + (' 문제' if lang == 'ko' else ' Problems'),
+                f"{very_easy}" + (t['problems'] if lang == 'ko' else '')
+            )
         
         st.markdown("---")
         
@@ -1842,50 +1913,76 @@ def main():
         st.markdown("---")
         
         # 4. 어려운 문제 vs 쉬운 문제 상세 분석
-        st.subheader("🔍 어려운 문제 vs 쉬운 문제 비교")
+        st.subheader("🔍 " + (
+            "어려운 문제 vs 쉬운 문제 비교" if lang == 'ko' else "Hard vs Easy Problems Comparison"
+        ))
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("#### 매우 어려운 문제 (정답률 < 20%)")
+            st.markdown("#### " + (
+                "매우 어려운 문제 (정답률 < 20%)" if lang == 'ko' else "Very Hard Problems (Correct Rate < 20%)"
+            ))
             very_hard_problems = difficulty[difficulty['difficulty_score'] < 20].sort_values('difficulty_score')
             
             if len(very_hard_problems) > 0:
-                st.metric("문제 수", f"{len(very_hard_problems)}개")
-                st.metric("평균 정답률", f"{very_hard_problems['difficulty_score'].mean():.1f}%")
+                st.metric(
+                    t['problem_count'],
+                    f"{len(very_hard_problems)}" + (t['problems'] if lang == 'ko' else '')
+                )
+                st.metric(
+                    '평균 정답률' if lang == 'ko' else 'Average Correct Rate',
+                    f"{very_hard_problems['difficulty_score'].mean():.1f}%"
+                )
                 
                 # 모델별 성능
                 very_hard_questions = very_hard_problems['Question'].tolist()
                 very_hard_model_perf = filtered_df[filtered_df['Question'].isin(very_hard_questions)].groupby('모델')['정답여부'].mean() * 100
                 
-                st.markdown("**모델별 성능**")
+                st.markdown("**" + (
+                    "모델별 성능" if lang == 'ko' else "Performance by Model"
+                ) + "**")
                 for model, acc in very_hard_model_perf.sort_values(ascending=False).items():
                     st.write(f"- {model}: {acc:.1f}%")
             else:
-                st.info("매우 어려운 문제가 없습니다.")
+                st.info(
+                    "매우 어려운 문제가 없습니다." if lang == 'ko' else "No very hard problems found."
+                )
         
         with col2:
-            st.markdown("#### 매우 쉬운 문제 (정답률 > 80%)")
+            st.markdown("#### " + (
+                "매우 쉬운 문제 (정답률 > 80%)" if lang == 'ko' else "Very Easy Problems (Correct Rate > 80%)"
+            ))
             very_easy_problems = difficulty[difficulty['difficulty_score'] > 80].sort_values('difficulty_score', ascending=False)
             
             if len(very_easy_problems) > 0:
-                st.metric("문제 수", f"{len(very_easy_problems)}개")
-                st.metric("평균 정답률", f"{very_easy_problems['difficulty_score'].mean():.1f}%")
+                st.metric(
+                    t['problem_count'],
+                    f"{len(very_easy_problems)}" + (t['problems'] if lang == 'ko' else '')
+                )
+                st.metric(
+                    '평균 정답률' if lang == 'ko' else 'Average Correct Rate',
+                    f"{very_easy_problems['difficulty_score'].mean():.1f}%"
+                )
                 
                 # 모델별 성능
                 very_easy_questions = very_easy_problems['Question'].tolist()
                 very_easy_model_perf = filtered_df[filtered_df['Question'].isin(very_easy_questions)].groupby('모델')['정답여부'].mean() * 100
                 
-                st.markdown("**모델별 성능**")
+                st.markdown("**" + (
+                    "모델별 성능" if lang == 'ko' else "Performance by Model"
+                ) + "**")
                 for model, acc in very_easy_model_perf.sort_values(ascending=False).items():
                     st.write(f"- {model}: {acc:.1f}%")
             else:
-                st.info("매우 쉬운 문제가 없습니다.")
+                st.info(
+                    "매우 쉬운 문제가 없습니다." if lang == 'ko' else "No very easy problems found."
+                )
         
         st.markdown("---")
         
         # 5. 난이도 구간별 상세 테이블
-        st.subheader("📋 난이도 구간별 상세 통계")
+        st.subheader("📋 " + t['difficulty_stats_by_range'])
         
         detailed_difficulty = model_difficulty.pivot_table(
             index='모델',

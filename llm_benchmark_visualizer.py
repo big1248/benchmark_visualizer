@@ -451,7 +451,7 @@ def safe_convert_to_int(value):
         return None
 
 def get_available_sessions(df, test_names):
-    """특정 테스트들에서 사용 가능한 세션 목록 반환"""
+    """특정 테스트들에서 사용 가능한 세션 목록 반환 (문자열과 숫자 모두 지원)"""
     if df is None or len(df) == 0:
         return []
     
@@ -463,12 +463,22 @@ def get_available_sessions(df, test_names):
     
     if 'Session' in test_df.columns:
         sessions_raw = test_df['Session'].dropna().unique().tolist()
-        sessions_int = []
+        sessions_clean = []
+        
         for s in sessions_raw:
-            s_int = safe_convert_to_int(s)
-            if s_int and s_int not in sessions_int:
-                sessions_int.append(s_int)
-        return sorted(sessions_int)
+            # 문자열이면 그대로 사용
+            if isinstance(s, str):
+                s_clean = s.strip()
+                if s_clean and s_clean not in sessions_clean:
+                    sessions_clean.append(s_clean)
+            # 숫자면 정수로 변환
+            else:
+                s_int = safe_convert_to_int(s)
+                if s_int is not None and s_int not in sessions_clean:
+                    sessions_clean.append(s_int)
+        
+        # 정렬: 숫자 먼저, 그 다음 문자열
+        return sorted(sessions_clean, key=lambda x: (isinstance(x, str), x))
     return []
 
 def create_problem_identifier(row, lang='ko'):
@@ -638,9 +648,10 @@ def main():
     if selected_prompts:
         filtered_df = filtered_df[filtered_df['프롬프팅'].isin(selected_prompts)]
     
-    # 세션 필터 (선택된 테스트들에 대해 동적으로 변경, multiselect로 변경)
+    # 세션 필터 (원본 데이터에서 추출, multiselect로 변경)
     if selected_tests:
-        available_sessions = get_available_sessions(filtered_df, selected_tests)
+        # 선택된 테스트들의 원본 데이터에서 세션 추출
+        available_sessions = get_available_sessions(results_df, selected_tests)
         if available_sessions:
             selected_sessions = st.sidebar.multiselect(
                 t['session'],
@@ -650,10 +661,19 @@ def main():
             )
             
             if selected_sessions:
-                # 선택된 세션과 매칭되는 원본 데이터 필터링
-                filtered_df = filtered_df[filtered_df['Session'].apply(
-                    lambda x: safe_convert_to_int(x) in selected_sessions if pd.notna(x) else False
-                )]
+                # 선택된 세션과 매칭 (문자열과 숫자 모두 지원)
+                def match_session(x):
+                    if pd.isna(x):
+                        return False
+                    # 문자열이면 그대로 비교
+                    if isinstance(x, str):
+                        return x.strip() in selected_sessions
+                    # 숫자면 정수로 변환하여 비교
+                    else:
+                        x_int = safe_convert_to_int(x)
+                        return x_int in selected_sessions if x_int is not None else False
+                
+                filtered_df = filtered_df[filtered_df['Session'].apply(match_session)]
     
     # 문제 유형 필터
     if 'image' in filtered_df.columns:
@@ -668,10 +688,16 @@ def main():
         elif selected_problem_type == t['text_only']:
             filtered_df = filtered_df[filtered_df['image'] == 'text_only']
     
-    # 연도 필터
-    if 'Year' in filtered_df.columns:
+    # 연도 필터 (원본 데이터에서 추출하여 모든 연도 표시)
+    if 'Year' in results_df.columns:
+        # 선택된 테스트들의 연도만 표시
+        if selected_tests:
+            year_source_df = results_df[results_df['테스트명'].isin(selected_tests)]
+        else:
+            year_source_df = results_df
+        
         # 연도를 정수로 변환하여 표시
-        years_raw = filtered_df['Year'].dropna().unique().tolist()
+        years_raw = year_source_df['Year'].dropna().unique().tolist()
         years_int = []
         for y in years_raw:
             y_int = safe_convert_to_int(y)
@@ -1249,6 +1275,21 @@ def main():
             st.info("Year data not available.")
         else:
             st.header(f"📅 {t['year_analysis']}")
+            
+            # 디버깅 정보 표시
+            with st.expander("🔍 디버깅 정보 (클릭하여 펼치기)"):
+                st.write("**필터링 전 원본 데이터:**")
+                st.write(f"- 전체 데이터 행 수: {len(results_df):,}")
+                st.write(f"- 원본 Year 고유값: {sorted([str(y) for y in results_df['Year'].dropna().unique().tolist()])}")
+                
+                st.write("**필터링 후 데이터:**")
+                st.write(f"- 필터링된 데이터 행 수: {len(filtered_df):,}")
+                st.write(f"- 필터링된 Year 고유값: {sorted([str(y) for y in filtered_df['Year'].dropna().unique().tolist()])}")
+                
+                st.write("**현재 필터 설정:**")
+                st.write(f"- 선택된 테스트: {selected_tests}")
+                st.write(f"- 선택된 모델: {selected_models}")
+                st.write(f"- 선택된 연도: {selected_years if 'selected_years' in locals() else '전체'}")
             
             # Year를 정수로 변환
             filtered_df['Year_Int'] = filtered_df['Year'].apply(safe_convert_to_int)

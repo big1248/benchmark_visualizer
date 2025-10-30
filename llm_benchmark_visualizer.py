@@ -1349,6 +1349,75 @@ def main():
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 
+                # 연도별 문제 수 차트 추가
+                st.markdown("---")
+                st.subheader("📊 연도별 문제 수 분포")
+                
+                # 테스트셋에서 실제 문제 수 계산 (중복 제거)
+                if selected_tests:
+                    year_problem_count = []
+                    for test_name in selected_tests:
+                        if test_name in testsets and 'Year' in testsets[test_name].columns:
+                            test_year_counts = testsets[test_name].groupby('Year').size()
+                            for year, count in test_year_counts.items():
+                                year_int = safe_convert_to_int(year)
+                                if year_int:
+                                    year_problem_count.append({'연도': year_int, '문제수': count})
+                    
+                    if year_problem_count:
+                        year_problem_df = pd.DataFrame(year_problem_count)
+                        year_problem_df = year_problem_df.groupby('연도')['문제수'].sum().reset_index()
+                        year_problem_df = year_problem_df.sort_values('연도')
+                    else:
+                        # 백업: filtered_df에서 고유 문제 수 계산
+                        year_problem_df = year_df.groupby('Year_Int')['Question'].nunique().reset_index()
+                        year_problem_df.columns = ['연도', '문제수']
+                        year_problem_df['연도'] = year_problem_df['연도'].astype(int)
+                        year_problem_df = year_problem_df.sort_values('연도')
+                else:
+                    # 테스트 선택 안 됨: filtered_df에서 계산
+                    year_problem_df = year_df.groupby('Year_Int')['Question'].nunique().reset_index()
+                    year_problem_df.columns = ['연도', '문제수']
+                    year_problem_df['연도'] = year_problem_df['연도'].astype(int)
+                    year_problem_df = year_problem_df.sort_values('연도')
+                
+                col1, col2 = st.columns([1, 2])
+                
+                with col1:
+                    # 연도별 문제 수 테이블
+                    st.dataframe(
+                        year_problem_df.style.format({
+                            '연도': '{:.0f}',
+                            '문제수': '{:.0f}'
+                        })
+                        .background_gradient(subset=['문제수'], cmap='Blues'),
+                        use_container_width=True
+                    )
+                    
+                    # 총 문제 수 표시
+                    st.metric("총 문제 수", f"{year_problem_df['문제수'].sum():,.0f}개")
+                
+                with col2:
+                    # 바 차트
+                    fig = px.bar(
+                        year_problem_df,
+                        x='연도',
+                        y='문제수',
+                        title='연도별 문제 수',
+                        text='문제수',
+                        color='문제수',
+                        color_continuous_scale='Blues'
+                    )
+                    fig.update_traces(texttemplate='%{text}', textposition='outside')
+                    fig.update_layout(
+                        height=400,
+                        showlegend=False,
+                        yaxis_title='문제 수',
+                        xaxis_title='연도',
+                        xaxis=dict(tickmode='linear')
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                
                 # 모델별 연도 성능 히트맵
                 st.markdown("---")
                 year_model = year_df.groupby(['모델', 'Year_Int'])['정답여부'].mean() * 100

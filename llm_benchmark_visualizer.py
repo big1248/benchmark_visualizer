@@ -92,6 +92,7 @@ LANGUAGES = {
         'non_law': '비법령',
         'overview': '전체 요약',
         'model_comparison': '모델별 비교',
+        'response_time_analysis': '응답시간 분석',
         'law_analysis': '법령/비법령 분석',
         'subject_analysis': '과목별 분석',
         'year_analysis': '연도별 분석',
@@ -164,6 +165,18 @@ LANGUAGES = {
         'easy': '쉬움',
         'very_easy': '매우 쉬운',
         'problem_distribution': '문제 분포',
+        'response_time': '응답 시간',
+        'avg_response_time': '평균 응답 시간',
+        'response_time_distribution': '응답 시간 분포',
+        'response_time_by_model': '모델별 응답 시간',
+        'response_time_stats': '응답 시간 통계',
+        'fastest_model': '가장 빠른 모델',
+        'slowest_model': '가장 느린 모델',
+        'response_time_vs_accuracy': '응답 시간 vs 정확도',
+        'time_per_problem': '문제당 시간',
+        'total_time': '총 소요 시간',
+        'seconds': '초',
+        'minutes': '분',
     },
     'en': {
         'title': 'LLM Benchmark Results Visualization Tool',
@@ -184,6 +197,7 @@ LANGUAGES = {
         'non_law': 'Non-Law',
         'overview': 'Overview',
         'model_comparison': 'Model Comparison',
+        'response_time_analysis': 'Response Time Analysis',
         'law_analysis': 'Law/Non-Law Analysis',
         'subject_analysis': 'Subject Analysis',
         'year_analysis': 'Year Analysis',
@@ -256,6 +270,18 @@ LANGUAGES = {
         'easy': 'Easy',
         'very_easy': 'Very Easy',
         'problem_distribution': 'Problem Distribution',
+        'response_time': 'Response Time',
+        'avg_response_time': 'Average Response Time',
+        'response_time_distribution': 'Response Time Distribution',
+        'response_time_by_model': 'Response Time by Model',
+        'response_time_stats': 'Response Time Statistics',
+        'fastest_model': 'Fastest Model',
+        'slowest_model': 'Slowest Model',
+        'response_time_vs_accuracy': 'Response Time vs Accuracy',
+        'time_per_problem': 'Time per Problem',
+        'total_time': 'Total Time',
+        'seconds': 'seconds',
+        'minutes': 'minutes',
     }
 }
 
@@ -372,6 +398,9 @@ def load_data(data_dir):
             except:
                 continue
     
+    # testset에서 테스트명 목록 추출 (자동 감지)
+    available_test_names = list(testsets.keys())
+    
     # 결과 파일들 로드
     result_files = glob.glob(os.path.join(data_dir, "*_detailed_*.csv")) + \
                    glob.glob(os.path.join(data_dir, "*_summary_*.csv"))
@@ -381,61 +410,80 @@ def load_data(data_dir):
         filename = os.path.basename(file)
         
         try:
-            # 파일명 파싱 개선
-            model = None
-            detail_type = None
-            prompt_type = None
+            # 파일명 형식: {모델명}_{상세도}_{프롬프팅}_{테스트명}.csv
+            # 예: llama-3-3-70b_detailed_noprompting_산업안전기사.csv
+            
+            # 테스트명 찾기 및 제거 (testset에서 추출한 목록 사용)
             test_name = None
+            filename_without_csv = filename.replace('.csv', '')
             
-            # Claude 모델 파싱
-            if "Claude" in filename:
-                if "Claude-3-5-Sonnet" in filename or "Claude-3.5-Sonnet" in filename:
-                    model = "Claude-3.5-Sonnet"
-                elif "Claude-3-5-Haiku" in filename or "Claude-3.5-Haiku" in filename:
-                    model = "Claude-3.5-Haiku"
-                elif "Claude-Sonnet-4" in filename:
-                    model = "Claude-Sonnet-4"
-                
-                if "detailed" in filename:
-                    detail_type = "detailed"
-                elif "summary" in filename:
-                    detail_type = "summary"
+            # 가장 긴 테스트명부터 매칭 (부분 매칭 방지)
+            sorted_test_names = sorted(available_test_names, key=len, reverse=True)
             
-            # GPT 모델 파싱
-            elif "GPT" in filename:
-                if "GPT-4o-Mini" in filename:
-                    model = "GPT-4o-Mini"
-                elif "GPT-4o" in filename:
-                    model = "GPT-4o"
-                
-                if "detailed" in filename:
-                    detail_type = "detailed"
-                elif "summary" in filename:
-                    detail_type = "summary"
-            
-            # 모델을 찾지 못한 경우 건너뛰기
-            if model is None or detail_type is None:
-                continue
-            
-            # 프롬프팅 방식 찾기 - 개선된 파싱
-            if "noprompting" in filename or "no-prompting" in filename or "no_prompting" in filename:
-                prompt_type = "no-prompting"
-            elif "few-shot" in filename or "few_shot" in filename or "fewshot" in filename:
-                prompt_type = "few-shot"
-            elif "cot" in filename.lower() or "chain-of-thought" in filename:
-                prompt_type = "cot"
-            else:
-                prompt_type = "unknown"
-            
-            # 테스트명 찾기
-            test_names = ["산업안전기사", "방재기사", "건설안전기사", "방재안전직"]
-            for tn in test_names:
-                if tn in filename:
+            for tn in sorted_test_names:
+                if filename_without_csv.endswith('_' + tn):
                     test_name = tn
+                    # 테스트명 제거
+                    filename_without_test = filename_without_csv[:-len('_' + tn)]
                     break
             
             if test_name is None:
                 continue
+            
+            # 남은 부분을 '_'로 분리
+            parts = filename_without_test.split('_')
+            
+            if len(parts) < 3:
+                continue
+            
+            # 상세도 찾기 (detailed 또는 summary)
+            detail_type = None
+            detail_idx = -1
+            for i, part in enumerate(parts):
+                if part in ['detailed', 'summary']:
+                    detail_type = part
+                    detail_idx = i
+                    break
+            
+            if detail_type is None or detail_idx == -1:
+                continue
+            
+            # 모델명 추출 (상세도 이전까지의 모든 부분을 결합)
+            model_parts = parts[:detail_idx]
+            model_raw = '_'.join(model_parts)
+            
+            # 프롬프팅 방식 추출 (상세도 다음부터 끝까지)
+            prompt_parts = parts[detail_idx + 1:]
+            prompt_raw = '_'.join(prompt_parts)
+            
+            # 프롬프팅 방식 정규화
+            if "noprompting" in prompt_raw.lower() or "no-prompting" in prompt_raw.lower() or "no_prompting" in prompt_raw.lower():
+                prompt_type = "no-prompting"
+            elif "few-shot" in prompt_raw.lower() or "few_shot" in prompt_raw.lower() or "fewshot" in prompt_raw.lower():
+                prompt_type = "few-shot"
+            elif "cot" in prompt_raw.lower() or "chain-of-thought" in prompt_raw.lower():
+                prompt_type = "cot"
+            else:
+                prompt_type = prompt_raw if prompt_raw else "unknown"
+            
+            # 모델명 정규화 (표시용)
+            model_display_mapping = {
+                # 로컬 모델
+                'llama-3-3-70b': 'Llama-3.3-70B',
+                'llama-3-1-8b-instruct': 'Llama-3.1-8B-Instruct',
+                'exaone-4-0-1-32b': 'EXAONE-4.0.1-32B',
+                'gemma-3-27b': 'Gemma-3-27B',
+                # API 모델
+                'claude-3-5-sonnet': 'Claude-3.5-Sonnet',
+                'claude-3-5-haiku': 'Claude-3.5-Haiku',
+                'claude-sonnet-4': 'Claude-Sonnet-4',
+                'gpt-4o-mini': 'GPT-4o-Mini',
+                'gpt-4o': 'GPT-4o'
+            }
+            
+            # 소문자로 변환하여 매칭 (대소문자 무시)
+            model_lower = model_raw.lower().replace('_', '-')
+            model = model_display_mapping.get(model_lower, model_raw.replace('_', '-'))
             
             # CSV 파일 읽기
             try:
@@ -781,6 +829,7 @@ def main():
     tabs = st.tabs([
         f"📊 {t['overview']}",
         f"🔍 {t['model_comparison']}",
+        f"⏱️ {t['response_time_analysis']}",
         f"⚖️ {t['law_analysis']}",
         f"📚 {t['subject_analysis']}",
         f"📅 {t['year_analysis']}",
@@ -1210,8 +1259,208 @@ def main():
             fig.update_xaxes(tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
     
-    # 탭 3: 법령/비법령 분석
+    # 탭 3: 응답시간 분석
     with tabs[2]:
+        st.header(f"⏱️ {t['response_time_analysis']}")
+        
+        # 문제당평균시간(초) 컬럼이 있는지 확인
+        time_columns = ['문제당평균시간(초)', '총소요시간(초)', 'question_duration']
+        available_time_col = None
+        for col in time_columns:
+            if col in filtered_df.columns:
+                available_time_col = col
+                break
+        
+        if available_time_col is None:
+            st.info("Response time data not available in the dataset.")
+        else:
+            # 응답시간 데이터 준비
+            if available_time_col == 'question_duration':
+                # question_duration은 개별 문제 시간
+                time_col = 'question_duration'
+                is_per_problem = True
+            elif available_time_col == '문제당평균시간(초)':
+                time_col = '문제당평균시간(초)'
+                is_per_problem = True
+            else:
+                time_col = '총소요시간(초)'
+                is_per_problem = False
+            
+            # NaN 값 제거
+            time_df = filtered_df[filtered_df[time_col].notna()].copy()
+            
+            if len(time_df) == 0:
+                st.info("No valid response time data available.")
+            else:
+                # 1. 모델별 평균 응답시간 통계
+                st.subheader(t['response_time_stats'])
+                
+                model_time_stats = time_df.groupby('모델').agg({
+                    time_col: ['mean', 'median', 'std', 'min', 'max', 'count']
+                }).reset_index()
+                
+                model_time_stats.columns = ['모델', '평균', '중앙값', '표준편차', '최소', '최대', '문제수']
+                model_time_stats = model_time_stats.sort_values('평균')
+                
+                # 정확도도 함께 표시
+                model_acc = filtered_df.groupby('모델')['정답여부'].mean().reset_index()
+                model_acc.columns = ['모델', '정확도']
+                model_acc['정확도'] = model_acc['정확도'] * 100
+                
+                model_time_stats = model_time_stats.merge(model_acc, on='모델')
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    fastest = model_time_stats.iloc[0]
+                    st.metric(
+                        t['fastest_model'],
+                        fastest['모델'],
+                        f"{fastest['평균']:.2f}{t['seconds']}"
+                    )
+                
+                with col2:
+                    slowest = model_time_stats.iloc[-1]
+                    st.metric(
+                        t['slowest_model'],
+                        slowest['모델'],
+                        f"{slowest['평균']:.2f}{t['seconds']}"
+                    )
+                
+                with col3:
+                    avg_time = model_time_stats['평균'].mean()
+                    st.metric(
+                        t['avg_response_time'],
+                        f"{avg_time:.2f}{t['seconds']}"
+                    )
+                
+                # 테이블
+                st.dataframe(
+                    model_time_stats.style.format({
+                        '평균': '{:.2f}',
+                        '중앙값': '{:.2f}',
+                        '표준편차': '{:.2f}',
+                        '최소': '{:.2f}',
+                        '최대': '{:.2f}',
+                        '문제수': '{:.0f}',
+                        '정확도': '{:.2f}%'
+                    }).background_gradient(subset=['평균'], cmap='RdYlGn_r'),
+                    use_container_width=True
+                )
+                
+                st.markdown("---")
+                
+                # 2. 시각화
+                st.subheader(t['response_time_by_model'])
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # 평균 응답시간 바 차트
+                    fig = px.bar(
+                        model_time_stats,
+                        x='모델',
+                        y='평균',
+                        title=t['avg_response_time'] + (' (' + t['time_per_problem'] + ')' if is_per_problem else ''),
+                        text='평균',
+                        color='평균',
+                        color_continuous_scale='RdYlGn_r'
+                    )
+                    fig.update_traces(
+                        texttemplate='%{text:.2f}s',
+                        textposition='outside',
+                        marker_line_color='black',
+                        marker_line_width=1.5
+                    )
+                    fig.update_layout(
+                        height=400,
+                        showlegend=False,
+                        yaxis_title=t['response_time'] + ' (' + t['seconds'] + ')',
+                        xaxis_title=t['model']
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # 박스플롯
+                    fig = px.box(
+                        time_df,
+                        x='모델',
+                        y=time_col,
+                        title=t['response_time_distribution'],
+                        color='모델'
+                    )
+                    fig.update_layout(
+                        height=400,
+                        showlegend=False,
+                        yaxis_title=t['response_time'] + ' (' + t['seconds'] + ')',
+                        xaxis_title=t['model']
+                    )
+                    fig.update_xaxes(tickangle=45)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                st.markdown("---")
+                
+                # 3. 응답시간 vs 정확도
+                st.subheader(t['response_time_vs_accuracy'])
+                
+                fig = px.scatter(
+                    model_time_stats,
+                    x='평균',
+                    y='정확도',
+                    size='문제수',
+                    text='모델',
+                    title=t['response_time_vs_accuracy'],
+                    labels={
+                        '평균': t['avg_response_time'] + ' (' + t['seconds'] + ')',
+                        '정확도': t['accuracy'] + ' (%)'
+                    }
+                )
+                fig.update_traces(
+                    textposition='top center',
+                    marker=dict(
+                        line=dict(width=2, color='black'),
+                        opacity=0.7
+                    )
+                )
+                fig.update_layout(height=500)
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # 인사이트
+                st.info(f"""
+                💡 **인사이트**:
+                - 가장 빠른 모델: **{fastest['모델']}** ({fastest['평균']:.2f}초, 정확도 {fastest['정확도']:.1f}%)
+                - 가장 느린 모델: **{slowest['모델']}** ({slowest['평균']:.2f}초, 정확도 {slowest['정확도']:.1f}%)
+                - 속도와 정확도의 상관관계를 차트에서 확인하세요.
+                """)
+                
+                st.markdown("---")
+                
+                # 4. 테스트별 응답시간 (테스트가 여러 개인 경우)
+                if '테스트명' in time_df.columns and time_df['테스트명'].nunique() > 1:
+                    st.subheader(f"{t['response_time']} ({t['by_test']})" if 'by_test' in t else "테스트별 응답시간")
+                    
+                    test_time = time_df.groupby(['모델', '테스트명'])[time_col].mean().reset_index()
+                    test_time.columns = ['모델', '테스트명', '평균시간']
+                    
+                    fig = px.bar(
+                        test_time,
+                        x='테스트명',
+                        y='평균시간',
+                        color='모델',
+                        barmode='group',
+                        title='테스트별 모델 응답시간' if lang == 'ko' else 'Response Time by Test',
+                        labels={'평균시간': t['avg_response_time'] + ' (' + t['seconds'] + ')'}
+                    )
+                    fig.update_layout(
+                        height=400,
+                        xaxis_title=t['testname'],
+                        yaxis_title=t['response_time'] + ' (' + t['seconds'] + ')'
+                    )
+                    fig.update_xaxes(tickangle=45)
+                    st.plotly_chart(fig, use_container_width=True)
+    
+    # 탭 4: 법령/비법령 분석
+    with tabs[8]:
         if 'law' not in filtered_df.columns:
             st.info("Law classification data not available.")
         else:
@@ -1293,8 +1542,8 @@ def main():
             )
             st.plotly_chart(fig, use_container_width=True)
     
-    # 탭 4: 과목별 분석
-    with tabs[3]:
+    # 탭 5: 과목별 분석
+    with tabs[8]:
         if 'Subject' not in filtered_df.columns:
             st.info("Subject data not available.")
         else:
@@ -1380,8 +1629,8 @@ def main():
             fig.update_xaxes(tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
     
-    # 탭 5: 연도별 분석
-    with tabs[4]:
+    # 탭 6: 연도별 분석
+    with tabs[8]:
         if 'Year' not in filtered_df.columns:
             st.info("Year data not available.")
         else:
@@ -1561,8 +1810,8 @@ def main():
             else:
                 st.info("연도 정보가 있는 데이터가 없습니다.")
     
-    # 탭 6: 오답 분석
-    with tabs[5]:
+    # 탭 7: 오답 분석
+    with tabs[8]:
         st.header(f"❌ {t['incorrect_analysis']}")
         
         # 문제별 오답률 계산
@@ -1761,8 +2010,8 @@ def main():
         fig.update_xaxes(tickangle=45)
         st.plotly_chart(fig, use_container_width=True)
     
-    # 탭 7: 난이도 분석
-    with tabs[6]:
+    # 탭 8: 난이도 분석
+    with tabs[8]:
         st.header(f"📈 {t['difficulty_analysis']}")
         
         # 문제별 난이도 계산 (정답률 기반)
@@ -2146,8 +2395,8 @@ def main():
             use_container_width=True
         )
     
-    # 탭 8: 테스트셋 통계
-    with tabs[7]:
+    # 탭 9: 테스트셋 통계
+    with tabs[8]:
         st.header(f"📋 {t['testset_stats']}")
         
         if selected_tests:

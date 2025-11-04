@@ -1460,7 +1460,7 @@ def main():
                     st.plotly_chart(fig, use_container_width=True)
     
     # 탭 4: 법령/비법령 분석
-    with tabs[8]:
+    with tabs[3]:
         if 'law' not in filtered_df.columns:
             st.info("Law classification data not available.")
         else:
@@ -1543,7 +1543,7 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
     
     # 탭 5: 과목별 분석
-    with tabs[8]:
+    with tabs[4]:
         if 'Subject' not in filtered_df.columns:
             st.info("Subject data not available.")
         else:
@@ -1630,7 +1630,7 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
     
     # 탭 6: 연도별 분석
-    with tabs[8]:
+    with tabs[5]:
         if 'Year' not in filtered_df.columns:
             st.info("Year data not available.")
         else:
@@ -1811,7 +1811,7 @@ def main():
                 st.info("연도 정보가 있는 데이터가 없습니다.")
     
     # 탭 7: 오답 분석
-    with tabs[8]:
+    with tabs[6]:
         st.header(f"❌ {t['incorrect_analysis']}")
         
         # 문제별 오답률 계산
@@ -2011,7 +2011,7 @@ def main():
         st.plotly_chart(fig, use_container_width=True)
     
     # 탭 8: 난이도 분석
-    with tabs[8]:
+    with tabs[7]:
         st.header(f"📈 {t['difficulty_analysis']}")
         
         # 문제별 난이도 계산 (정답률 기반)

@@ -466,24 +466,101 @@ def load_data(data_dir):
             else:
                 prompt_type = prompt_raw if prompt_raw else "unknown"
             
-            # 모델명 정규화 (표시용)
-            model_display_mapping = {
-                # 로컬 모델
-                'llama-3-3-70b': 'Llama-3.3-70B',
-                'llama-3-1-8b-instruct': 'Llama-3.1-8B-Instruct',
-                'exaone-4-0-1-32b': 'EXAONE-4.0.1-32B',
-                'gemma-3-27b': 'Gemma-3-27B',
-                # API 모델
-                'claude-3-5-sonnet': 'Claude-3.5-Sonnet',
-                'claude-3-5-haiku': 'Claude-3.5-Haiku',
-                'claude-sonnet-4': 'Claude-Sonnet-4',
-                'gpt-4o-mini': 'GPT-4o-Mini',
-                'gpt-4o': 'GPT-4o'
-            }
+            # 🔥 모델명 자동 파싱 및 정규화 (하드코딩 제거)
+            # 언더스코어를 하이픈으로 변환하고 소문자로 정규화
+            model_normalized = model_raw.lower().replace('_', '-')
             
-            # 소문자로 변환하여 매칭 (대소문자 무시)
-            model_lower = model_raw.lower().replace('_', '-')
-            model = model_display_mapping.get(model_lower, model_raw.replace('_', '-'))
+            # 스마트 모델명 표시 변환 함수
+            def format_model_name(model_str):
+                """
+                모델명을 사람이 읽기 쉬운 형식으로 변환
+                예: claude-sonnet-4-5-20250929 → Claude-Sonnet-4.5
+                    gpt-4o-mini → GPT-4o-Mini
+                    llama-3-3-70b → Llama-3.3-70b
+                """
+                # 날짜 패턴 제거 (8자리 숫자)
+                import re
+                model_str = re.sub(r'-\d{8}$', '', model_str)
+                
+                # 특수 케이스: GPT 모델
+                if model_str.startswith('gpt-'):
+                    # gpt-4o-mini → GPT-4o-Mini
+                    parts = model_str.split('-')
+                    formatted_parts = ['GPT']
+                    
+                    for i in range(1, len(parts)):
+                        part = parts[i]
+                        # 4o는 그대로 유지 (소문자 o)
+                        if part == '4o' or part == '3.5':
+                            formatted_parts.append(part)
+                        # 숫자는 그대로
+                        elif part.isdigit():
+                            formatted_parts.append(part)
+                        # mini, turbo 등은 첫 글자만 대문자
+                        else:
+                            formatted_parts.append(part.capitalize())
+                    
+                    return '-'.join(formatted_parts)
+                
+                # Claude 모델 처리
+                if model_str.startswith('claude-'):
+                    parts = model_str.split('-')
+                    formatted_parts = ['Claude']
+                    
+                    i = 1
+                    while i < len(parts):
+                        part = parts[i]
+                        
+                        # 버전 번호 처리 (4-5 → 4.5, 3-5 → 3.5)
+                        if i + 1 < len(parts) and part.isdigit() and parts[i+1].isdigit():
+                            formatted_parts.append(f"{part}.{parts[i+1]}")
+                            i += 2
+                        # 모델 타입은 첫 글자 대문자
+                        elif part in ['sonnet', 'haiku', 'opus']:
+                            formatted_parts.append(part.capitalize())
+                            i += 1
+                        # 숫자는 그대로
+                        elif part.isdigit():
+                            formatted_parts.append(part)
+                            i += 1
+                        else:
+                            formatted_parts.append(part.capitalize())
+                            i += 1
+                    
+                    return '-'.join(formatted_parts)
+                
+                # 기타 모델: 스마트 버전 번호 처리
+                # 예: llama-3-3-70b → Llama-3.3-70b
+                #     qwen-2-5-72b → Qwen-2.5-72b
+                parts = model_str.split('-')
+                formatted_parts = []
+                
+                i = 0
+                while i < len(parts):
+                    part = parts[i]
+                    
+                    # 첫 번째 파트 (모델명)
+                    if i == 0:
+                        formatted_parts.append(part.capitalize())
+                        i += 1
+                    # 연속된 두 개의 한 자리 숫자 → 버전 번호로 변환
+                    elif (i + 1 < len(parts) and 
+                          part.isdigit() and len(part) == 1 and 
+                          parts[i+1].isdigit() and len(parts[i+1]) == 1):
+                        formatted_parts.append(f"{part}.{parts[i+1]}")
+                        i += 2
+                    # 일반 단어는 첫 글자 대문자
+                    elif not part.isdigit() and not any(c.isdigit() for c in part):
+                        formatted_parts.append(part.capitalize())
+                        i += 1
+                    # 숫자나 숫자+문자 조합은 그대로
+                    else:
+                        formatted_parts.append(part)
+                        i += 1
+                
+                return '-'.join(formatted_parts)
+            
+            model = format_model_name(model_normalized)
             
             # CSV 파일 읽기
             try:

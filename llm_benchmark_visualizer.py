@@ -118,7 +118,7 @@ LANGUAGES = {
         'year_performance': '연도별 성능',
         'top_incorrect': '오답률 높은 문제 Top 20',
         'all_models_incorrect': '모든 모델이 틀린 문제',
-        'most_models_incorrect': '대부분 모델이 틀린 문제 (≥20%)',
+        'most_models_incorrect': '대부분 모델이 틀린 문제 (≥50%)',
         'test_info': '테스트',
         'problem_id': '문제번호',
         'incorrect_count': '오답 모델수',
@@ -223,7 +223,7 @@ LANGUAGES = {
         'year_performance': 'Performance by Year',
         'top_incorrect': 'Top 20 Problems with Highest Incorrect Rate',
         'all_models_incorrect': 'Problems All Models Got Wrong',
-        'most_models_incorrect': 'Problems Most Models Got Wrong (≥20%)',
+        'most_models_incorrect': 'Problems Most Models Got Wrong (≥50%)',
         'test_info': 'Test',
         'problem_id': 'Problem ID',
         'incorrect_count': 'Incorrect Models',
@@ -1907,8 +1907,9 @@ def main():
             
             st.dataframe(display_all_wrong, use_container_width=True)
             
-            # 문제 상세 보기 옵션
+            # 문제 상세 보기 옵션 - 모든 문제 표시
             if st.checkbox('문제 내용 보기' if lang == 'ko' else 'Show Question Details'):
+                st.info(f"총 {len(all_wrong)}개 문제의 상세 내용을 표시합니다." if lang == 'ko' else f"Showing details for all {len(all_wrong)} problems.")
                 for idx, row in all_wrong.iterrows():
                     with st.expander(f"{row['problem_id']}"):
                         q_detail = filtered_df[filtered_df['Question'] == row['Question']].iloc[0]
@@ -1932,11 +1933,11 @@ def main():
         else:
             st.info("No problems that all models got wrong.")
         
-        # 대부분 모델이 틀린 문제 (20% 이상)
+        # 대부분 모델이 틀린 문제 (50% 이상)
         st.markdown("---")
         st.subheader(t['most_models_incorrect'])
         
-        most_wrong = problem_analysis[problem_analysis['incorrect_rate'] >= 0.2]
+        most_wrong = problem_analysis[problem_analysis['incorrect_rate'] >= 0.5]
         
         if len(most_wrong) > 0:
             display_most_wrong = pd.DataFrame({
@@ -1959,9 +1960,10 @@ def main():
                 use_container_width=True
             )
             
-            # 문제 상세 보기 옵션
+            # 문제 상세 보기 옵션 - 모든 문제 표시
             if st.checkbox('문제 내용 보기 (대부분 틀린 문제)' if lang == 'ko' else 'Show Question Details (Most Incorrect)', key='most_wrong_details'):
-                for idx, row in most_wrong.head(10).iterrows():  # 상위 10개만 표시
+                st.info(f"총 {len(most_wrong)}개 문제의 상세 내용을 표시합니다." if lang == 'ko' else f"Showing details for all {len(most_wrong)} problems.")
+                for idx, row in most_wrong.iterrows():  # 모든 문제 표시
                     with st.expander(f"{row['problem_id']} - 오답률 {row['incorrect_rate']*100:.1f}%"):
                         q_detail = filtered_df[filtered_df['Question'] == row['Question']].iloc[0]
                         st.write(f"**{t['question']}:** {q_detail['Question']}")

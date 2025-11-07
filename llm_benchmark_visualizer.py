@@ -532,6 +532,7 @@ def load_data(data_dir):
                 # 기타 모델: 스마트 버전 번호 처리
                 # 예: llama-3-3-70b → Llama-3.3-70b
                 #     qwen-2-5-72b → Qwen-2.5-72b
+                #     qwen2-5-32b → Qwen2.5-32b
                 parts = model_str.split('-')
                 formatted_parts = []
                 
@@ -541,6 +542,13 @@ def load_data(data_dir):
                     
                     # 첫 번째 파트 (모델명)
                     if i == 0:
+                        # 특수 케이스: qwen2, llama3 등 숫자가 붙은 모델명
+                        if part[:-1].isalpha() and part[-1].isdigit():
+                            # 다음 파트가 한 자리 숫자면 버전으로 변환
+                            if i + 1 < len(parts) and parts[i+1].isdigit() and len(parts[i+1]) == 1:
+                                formatted_parts.append(f"{part.capitalize()}.{parts[i+1]}")
+                                i += 2
+                                continue
                         formatted_parts.append(part.capitalize())
                         i += 1
                     # 연속된 두 개의 한 자리 숫자 → 버전 번호로 변환

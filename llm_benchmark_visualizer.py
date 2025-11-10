@@ -390,14 +390,20 @@ def set_plotly_font_size(chart_text_multiplier=1.0):
     tick_size = int(12 * chart_text_multiplier)
     legend_size = int(12 * chart_text_multiplier)
     
-    # 간단한 글로벌 템플릿 설정
+    # plotly 기본 템플릿 복사
     pio.templates["custom"] = pio.templates["plotly"]
+    
+    # 전역 폰트 크기 설정
     pio.templates["custom"].layout.font.size = axis_size
     pio.templates["custom"].layout.title.font.size = title_size
+    
+    # 축 폰트 설정
     pio.templates["custom"].layout.xaxis.tickfont.size = tick_size
-    pio.templates["custom"].layout.xaxis.titlefont.size = axis_size
+    pio.templates["custom"].layout.xaxis.title.font.size = axis_size
     pio.templates["custom"].layout.yaxis.tickfont.size = tick_size
-    pio.templates["custom"].layout.yaxis.titlefont.size = axis_size
+    pio.templates["custom"].layout.yaxis.title.font.size = axis_size
+    
+    # 범례 폰트 설정
     pio.templates["custom"].layout.legend.font.size = legend_size
     
     # 기본 템플릿으로 설정

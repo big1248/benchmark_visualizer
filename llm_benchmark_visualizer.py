@@ -148,7 +148,8 @@ LANGUAGES = {
         'basic_filters': '테스트명, 모델, 상세도, 프롬프팅 방식으로 필터링',
         'law_analysis_desc': '법령/비법령 구분 분석',
         'detail_analysis': '과목별, 연도별 상세 분석',
-        'font_size': '폰트 크기',
+        'font_size': '화면 폰트 크기',
+        'chart_text_size': '차트 텍스트 크기',
         'year_problem_distribution': '연도별 문제 수 분포',
         'problem_count_table': '연도별 문제 수 테이블',
         'year_problem_chart': '연도별 문제 수',
@@ -253,7 +254,8 @@ LANGUAGES = {
         'basic_filters': 'Filter by test name, model, detail type, prompting method',
         'law_analysis_desc': 'Analyze law/non-law distinction',
         'detail_analysis': 'Detailed analysis by subject and year',
-        'font_size': 'Font Size',
+        'font_size': 'Screen Font Size',
+        'chart_text_size': 'Chart Text Size',
         'year_problem_distribution': 'Problem Distribution by Year',
         'problem_count_table': 'Problem Count by Year',
         'year_problem_chart': 'Problems by Year',
@@ -329,7 +331,16 @@ def apply_custom_css(font_size_multiplier=1.0):
         
         /* 테이블 폰트 크기 */
         .dataframe {{
-            font-size: {int(15 * font_size_multiplier)}px !important;
+            font-size: {int(16 * font_size_multiplier)}px !important;
+        }}
+        
+        .dataframe th {{
+            font-size: {int(16 * font_size_multiplier)}px !important;
+            font-weight: 600 !important;
+        }}
+        
+        .dataframe td {{
+            font-size: {int(16 * font_size_multiplier)}px !important;
         }}
         
         /* 사이드바 폰트 크기 */
@@ -367,6 +378,41 @@ def apply_custom_css(font_size_multiplier=1.0):
         }}
     </style>
     """, unsafe_allow_html=True)
+
+# Plotly 차트 글로벌 폰트 크기 설정
+def set_plotly_font_size(chart_text_multiplier=1.0):
+    """모든 Plotly 차트에 적용될 기본 폰트 크기 설정"""
+    import plotly.io as pio
+    
+    # 기본 폰트 크기 계산
+    title_size = int(20 * chart_text_multiplier)
+    axis_size = int(14 * chart_text_multiplier)
+    tick_size = int(12 * chart_text_multiplier)
+    legend_size = int(12 * chart_text_multiplier)
+    annotation_size = int(12 * chart_text_multiplier)
+    
+    # 글로벌 템플릿 설정
+    pio.templates["custom"] = go.layout.Template(
+        layout=go.Layout(
+            font=dict(size=axis_size),
+            title_font=dict(size=title_size),
+            xaxis=dict(
+                tickfont=dict(size=tick_size),
+                titlefont=dict(size=axis_size)
+            ),
+            yaxis=dict(
+                tickfont=dict(size=tick_size),
+                titlefont=dict(size=axis_size)
+            ),
+            legend=dict(font=dict(size=legend_size)),
+            annotations=[dict(font=dict(size=annotation_size))]
+        )
+    )
+    
+    # 기본 템플릿으로 설정
+    pio.templates.default = "custom"
+    
+    return annotation_size  # 개별 차트에서 사용할 수 있도록 반환
 
 # 안전한 정렬 함수 (타입 혼합 대응)
 def safe_sort(values):
@@ -725,16 +771,32 @@ def main():
     lang = st.session_state.language
     t = LANGUAGES[lang]
     
-    # 폰트 크기 조정
+    # 화면 설정
     st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🎨 " + ("화면 설정" if lang == 'ko' else "Display Settings"))
+    
+    # 폰트 크기 조정
     font_size = st.sidebar.slider(
         t['font_size'],
         min_value=0.8,
         max_value=1.5,
         value=1.0,
-        step=0.1
+        step=0.1,
+        help="화면 전체의 폰트 크기를 조절합니다"
     )
+    
+    # 차트 텍스트 크기 조정
+    chart_text_size = st.sidebar.slider(
+        t['chart_text_size'],
+        min_value=0.7,
+        max_value=1.8,
+        value=1.0,
+        step=0.1,
+        help="차트 내부 텍스트, 숫자, 레이블 크기를 조절합니다"
+    )
+    
     apply_custom_css(font_size)
+    annotation_size = set_plotly_font_size(chart_text_size)
     
     # 제목
     st.title(f"🎯 {t['title']}")
@@ -1334,7 +1396,7 @@ def main():
                 colorscale='RdYlGn',
                 text=np.round(heatmap_pivot.values, 1),
                 texttemplate='%{text:.1f}',
-                textfont={"size": 10},
+                textfont={"size": int(12 * chart_text_size)},
                 colorbar=dict(title=t['accuracy'] + " (%)"),
                 xgap=2,  # 셀 경계선
                 ygap=2
@@ -1705,7 +1767,7 @@ def main():
                 colorscale='RdYlGn',
                 text=np.round(subject_model_pivot.values, 1),
                 texttemplate='%{text:.1f}',
-                textfont={"size": 10},
+                textfont={"size": int(12 * chart_text_size)},
                 colorbar=dict(title=t['accuracy'] + " (%)"),
                 xgap=2,  # 셀 경계선
                 ygap=2
@@ -1885,7 +1947,7 @@ def main():
                     colorscale='RdYlGn',
                     text=np.round(year_model_pivot.values, 1),
                     texttemplate='%{text:.1f}',
-                    textfont={"size": 10},
+                    textfont={"size": int(12 * chart_text_size)},
                     colorbar=dict(title=t['accuracy'] + " (%)"),
                     xgap=2,  # 셀 경계선
                     ygap=2
@@ -2301,7 +2363,7 @@ def main():
             colorscale='RdYlGn',
             text=np.round(pivot_difficulty.values, 1),
             texttemplate='%{text:.1f}',
-            textfont={"size": 10},
+            textfont={"size": int(12 * chart_text_size)},
             colorbar=dict(title=t['accuracy'] + " (%)"),
             xgap=2,  # 셀 경계선
             ygap=2
@@ -2379,7 +2441,7 @@ def main():
                 colorscale='Blues',
                 text=pivot_subject_diff.values.astype(int),
                 texttemplate='%{text}',
-                textfont={"size": 10},
+                textfont={"size": int(12 * chart_text_size)},
                 colorbar=dict(title=t['problem_count']),
                 xgap=2,  # 셀 경계선
                 ygap=2

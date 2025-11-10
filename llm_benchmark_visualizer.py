@@ -389,30 +389,21 @@ def set_plotly_font_size(chart_text_multiplier=1.0):
     axis_size = int(14 * chart_text_multiplier)
     tick_size = int(12 * chart_text_multiplier)
     legend_size = int(12 * chart_text_multiplier)
-    annotation_size = int(12 * chart_text_multiplier)
     
-    # 글로벌 템플릿 설정
-    pio.templates["custom"] = go.layout.Template(
-        layout=go.Layout(
-            font=dict(size=axis_size),
-            title_font=dict(size=title_size),
-            xaxis=dict(
-                tickfont=dict(size=tick_size),
-                titlefont=dict(size=axis_size)
-            ),
-            yaxis=dict(
-                tickfont=dict(size=tick_size),
-                titlefont=dict(size=axis_size)
-            ),
-            legend=dict(font=dict(size=legend_size)),
-            annotations=[dict(font=dict(size=annotation_size))]
-        )
-    )
+    # 간단한 글로벌 템플릿 설정
+    pio.templates["custom"] = pio.templates["plotly"]
+    pio.templates["custom"].layout.font.size = axis_size
+    pio.templates["custom"].layout.title.font.size = title_size
+    pio.templates["custom"].layout.xaxis.tickfont.size = tick_size
+    pio.templates["custom"].layout.xaxis.titlefont.size = axis_size
+    pio.templates["custom"].layout.yaxis.tickfont.size = tick_size
+    pio.templates["custom"].layout.yaxis.titlefont.size = axis_size
+    pio.templates["custom"].layout.legend.font.size = legend_size
     
     # 기본 템플릿으로 설정
     pio.templates.default = "custom"
     
-    return annotation_size  # 개별 차트에서 사용할 수 있도록 반환
+    return int(12 * chart_text_multiplier)  # 히트맵용 크기 반환
 
 # 안전한 정렬 함수 (타입 혼합 대응)
 def safe_sort(values):

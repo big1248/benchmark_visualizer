@@ -178,6 +178,32 @@ LANGUAGES = {
         'total_time': '총 소요 시간',
         'seconds': '초',
         'minutes': '분',
+        # 토큰 및 비용 관련
+        'token_cost_analysis': '토큰 및 비용 분석',
+        'token_usage': '토큰 사용량',
+        'input_tokens': '입력 토큰',
+        'output_tokens': '출력 토큰',
+        'total_tokens': '총 토큰',
+        'avg_tokens_per_problem': '문제당 평균 토큰',
+        'token_distribution': '토큰 분포',
+        'token_efficiency': '토큰 효율성',
+        'token_stats': '토큰 통계',
+        'io_ratio': '입출력 토큰 비율',
+        'token_per_correct': '정답당 토큰',
+        'tokens': '토큰',
+        'cost_level': '비용 수준',
+        'cost_analysis': '비용 분석',
+        'cost_per_problem': '문제당 비용',
+        'total_cost_estimate': '총 예상 비용',
+        'cost_vs_accuracy': '비용 vs 정확도',
+        'cost_efficiency': '비용 효율성',
+        'most_efficient': '가장 효율적인 모델',
+        'least_efficient': '가장 비효율적인 모델',
+        'cost_stats': '비용 통계',
+        'high': '높음',
+        'medium_cost': '중간',
+        'low': '낮음',
+        'cost': '비용',
     },
     'en': {
         'title': 'LLM Benchmark Results Visualization Tool',
@@ -284,6 +310,32 @@ LANGUAGES = {
         'total_time': 'Total Time',
         'seconds': 'seconds',
         'minutes': 'minutes',
+        # Token & Cost related
+        'token_cost_analysis': 'Token & Cost Analysis',
+        'token_usage': 'Token Usage',
+        'input_tokens': 'Input Tokens',
+        'output_tokens': 'Output Tokens',
+        'total_tokens': 'Total Tokens',
+        'avg_tokens_per_problem': 'Avg Tokens per Problem',
+        'token_distribution': 'Token Distribution',
+        'token_efficiency': 'Token Efficiency',
+        'token_stats': 'Token Statistics',
+        'io_ratio': 'Input/Output Token Ratio',
+        'token_per_correct': 'Tokens per Correct Answer',
+        'tokens': 'tokens',
+        'cost_level': 'Cost Level',
+        'cost_analysis': 'Cost Analysis',
+        'cost_per_problem': 'Cost per Problem',
+        'total_cost_estimate': 'Total Cost Estimate',
+        'cost_vs_accuracy': 'Cost vs Accuracy',
+        'cost_efficiency': 'Cost Efficiency',
+        'most_efficient': 'Most Efficient Model',
+        'least_efficient': 'Least Efficient Model',
+        'cost_stats': 'Cost Statistics',
+        'high': 'High',
+        'medium_cost': 'Medium',
+        'low': 'Low',
+        'cost': 'cost',
     }
 }
 
@@ -979,6 +1031,7 @@ def main():
         f"📅 {t['year_analysis']}",
         f"❌ {t['incorrect_analysis']}",
         f"📈 {t['difficulty_analysis']}",
+        f"💰 {t['token_cost_analysis']}",
         f"📋 {t['testset_stats']}"
     ])
     
@@ -2541,8 +2594,507 @@ def main():
             use_container_width=True
         )
     
-    # 탭 9: 테스트셋 통계
+    # 탭 9: 토큰 및 비용 분석
     with tabs[8]:
+        st.header(f"💰 {t['token_cost_analysis']}")
+        
+        # 토큰 관련 컬럼 확인
+        token_columns = {
+            'input': ['입력토큰', 'input_tokens', 'Input Tokens'],
+            'output': ['출력토큰', 'output_tokens', 'Output Tokens'],
+            'total': ['총토큰', 'total_tokens', 'Total Tokens'],
+            'cost': ['비용수준', 'cost_level', 'Cost Level']
+        }
+        
+        # 사용 가능한 컬럼 찾기
+        available_cols = {}
+        for key, possible_names in token_columns.items():
+            for col_name in possible_names:
+                if col_name in filtered_df.columns:
+                    available_cols[key] = col_name
+                    break
+        
+        if not available_cols:
+            st.info("Token usage data not available in the dataset." if lang == 'en' else "토큰 사용량 데이터가 데이터셋에 없습니다.")
+        else:
+            # 데이터 준비
+            token_df = filtered_df.copy()
+            
+            # NaN 제거
+            for key, col in available_cols.items():
+                if col in token_df.columns:
+                    token_df = token_df[token_df[col].notna()]
+            
+            if len(token_df) == 0:
+                st.info("No valid token data available after filtering." if lang == 'en' else "필터링 후 유효한 토큰 데이터가 없습니다.")
+            else:
+                # 1. 토큰 통계 요약
+                st.subheader(f"📊 {t['token_stats']}")
+                
+                # 모델별 토큰 사용량 계산
+                agg_dict = {}
+                if 'input' in available_cols:
+                    agg_dict[available_cols['input']] = ['sum', 'mean']
+                if 'output' in available_cols:
+                    agg_dict[available_cols['output']] = ['sum', 'mean']
+                if 'total' in available_cols:
+                    agg_dict[available_cols['total']] = ['sum', 'mean']
+                
+                model_token_stats = token_df.groupby('모델').agg(agg_dict).reset_index()
+                
+                # 컬럼명 정리
+                new_cols = ['모델']
+                for col in model_token_stats.columns[1:]:
+                    if col[0] == available_cols.get('input', ''):
+                        if col[1] == 'sum':
+                            new_cols.append('총_입력토큰')
+                        else:
+                            new_cols.append('평균_입력토큰')
+                    elif col[0] == available_cols.get('output', ''):
+                        if col[1] == 'sum':
+                            new_cols.append('총_출력토큰')
+                        else:
+                            new_cols.append('평균_출력토큰')
+                    elif col[0] == available_cols.get('total', ''):
+                        if col[1] == 'sum':
+                            new_cols.append('총_토큰')
+                        else:
+                            new_cols.append('평균_토큰')
+                
+                model_token_stats.columns = new_cols
+                
+                # 정확도 추가
+                model_acc = token_df.groupby('모델')['정답여부'].mean().reset_index()
+                model_acc.columns = ['모델', '정확도']
+                model_acc['정확도'] = model_acc['정확도'] * 100
+                
+                model_token_stats = model_token_stats.merge(model_acc, on='모델')
+                
+                # 문제 수 추가
+                model_problem_count = token_df.groupby('모델')['Question'].count().reset_index()
+                model_problem_count.columns = ['모델', '문제수']
+                model_token_stats = model_token_stats.merge(model_problem_count, on='모델')
+                
+                # 비용 수준 추가 (있는 경우)
+                if 'cost' in available_cols:
+                    cost_col = available_cols['cost']
+                    # 가장 빈번한 비용 수준 찾기
+                    model_cost = token_df.groupby('모델')[cost_col].agg(lambda x: x.mode()[0] if len(x.mode()) > 0 else 'unknown').reset_index()
+                    model_cost.columns = ['모델', '비용수준']
+                    model_token_stats = model_token_stats.merge(model_cost, on='모델')
+                
+                # 토큰 효율성 계산 (정답당 토큰)
+                if '총_토큰' in model_token_stats.columns:
+                    model_token_stats['정답당_토큰'] = model_token_stats.apply(
+                        lambda row: row['총_토큰'] / (row['문제수'] * row['정확도'] / 100) if row['정확도'] > 0 else 0,
+                        axis=1
+                    )
+                
+                # 주요 메트릭 표시
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    if '총_토큰' in model_token_stats.columns:
+                        total_tokens = model_token_stats['총_토큰'].sum()
+                        st.metric(
+                            t['total_tokens'],
+                            f"{total_tokens:,.0f}"
+                        )
+                
+                with col2:
+                    if '평균_토큰' in model_token_stats.columns:
+                        avg_tokens = model_token_stats['평균_토큰'].mean()
+                        st.metric(
+                            t['avg_tokens_per_problem'],
+                            f"{avg_tokens:,.0f}"
+                        )
+                
+                with col3:
+                    if '총_입력토큰' in model_token_stats.columns and '총_출력토큰' in model_token_stats.columns:
+                        total_input = model_token_stats['총_입력토큰'].sum()
+                        total_output = model_token_stats['총_출력토큰'].sum()
+                        io_ratio = total_input / total_output if total_output > 0 else 0
+                        st.metric(
+                            t['io_ratio'],
+                            f"{io_ratio:.2f}:1"
+                        )
+                
+                with col4:
+                    if '정답당_토큰' in model_token_stats.columns and len(model_token_stats[model_token_stats['정답당_토큰'] > 0]) > 0:
+                        # 가장 효율적인 모델 (정답당 토큰이 적은 모델)
+                        valid_stats = model_token_stats[model_token_stats['정답당_토큰'] > 0]
+                        most_efficient = valid_stats.loc[valid_stats['정답당_토큰'].idxmin()]
+                        st.metric(
+                            t['most_efficient'],
+                            most_efficient['모델'],
+                            f"{most_efficient['정답당_토큰']:,.0f} " + t['tokens']
+                        )
+                
+                # 상세 테이블
+                st.markdown("---")
+                st.subheader("📋 " + ("모델별 토큰 사용량 상세" if lang == 'ko' else "Detailed Token Usage by Model"))
+                
+                # 컬럼 순서 정리
+                display_cols = ['모델']
+                if '총_입력토큰' in model_token_stats.columns:
+                    display_cols.append('총_입력토큰')
+                if '총_출력토큰' in model_token_stats.columns:
+                    display_cols.append('총_출력토큰')
+                if '총_토큰' in model_token_stats.columns:
+                    display_cols.append('총_토큰')
+                if '평균_토큰' in model_token_stats.columns:
+                    display_cols.append('평균_토큰')
+                display_cols.extend(['정확도', '문제수'])
+                if '비용수준' in model_token_stats.columns:
+                    display_cols.append('비용수준')
+                if '정답당_토큰' in model_token_stats.columns:
+                    display_cols.append('정답당_토큰')
+                
+                display_df = model_token_stats[display_cols].sort_values('총_토큰' if '총_토큰' in display_cols else '모델', ascending=False)
+                
+                # 포맷팅
+                format_dict = {
+                    '총_입력토큰': '{:,.0f}',
+                    '총_출력토큰': '{:,.0f}',
+                    '총_토큰': '{:,.0f}',
+                    '평균_토큰': '{:,.0f}',
+                    '정확도': '{:.2f}%',
+                    '정답당_토큰': '{:,.0f}'
+                }
+                
+                st.dataframe(
+                    display_df.style.format(format_dict).background_gradient(
+                        subset=['정답당_토큰'] if '정답당_토큰' in display_cols else [],
+                        cmap='RdYlGn_r'
+                    ),
+                    use_container_width=True
+                )
+                
+                st.markdown("---")
+                
+                # 2. 시각화
+                st.subheader("📊 " + ("토큰 사용량 시각화" if lang == 'ko' else "Token Usage Visualization"))
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # 모델별 총 토큰 사용량
+                    if '총_토큰' in model_token_stats.columns:
+                        fig = px.bar(
+                            display_df,
+                            x='모델',
+                            y='총_토큰',
+                            title=t['total_tokens'] + ' (' + ('모델별' if lang == 'ko' else 'by Model') + ')',
+                            text='총_토큰',
+                            color='총_토큰',
+                            color_continuous_scale='Blues'
+                        )
+                        fig.update_traces(
+                            texttemplate='%{text:,.0f}',
+                            textposition='outside',
+                            marker_line_color='black',
+                            marker_line_width=1.5
+                        )
+                        fig.update_layout(
+                            height=400,
+                            showlegend=False,
+                            yaxis_title=t['total_tokens'],
+                            xaxis_title=t['model']
+                        )
+                        fig.update_xaxes(tickangle=45)
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # 입출력 토큰 비교
+                    if '총_입력토큰' in model_token_stats.columns and '총_출력토큰' in model_token_stats.columns:
+                        fig = go.Figure()
+                        fig.add_trace(go.Bar(
+                            name=t['input_tokens'],
+                            x=display_df['모델'],
+                            y=display_df['총_입력토큰'],
+                            marker_color='lightblue',
+                            marker_line_color='black',
+                            marker_line_width=1.5
+                        ))
+                        fig.add_trace(go.Bar(
+                            name=t['output_tokens'],
+                            x=display_df['모델'],
+                            y=display_df['총_출력토큰'],
+                            marker_color='lightcoral',
+                            marker_line_color='black',
+                            marker_line_width=1.5
+                        ))
+                        
+                        fig.update_layout(
+                            barmode='stack',
+                            title=f"{t['input_tokens']} vs {t['output_tokens']}",
+                            height=400,
+                            yaxis_title=t['tokens'],
+                            xaxis_title=t['model']
+                        )
+                        fig.update_xaxes(tickangle=45)
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                st.markdown("---")
+                
+                # 3. 토큰 효율성 분석
+                if '정답당_토큰' in model_token_stats.columns:
+                    st.subheader("🎯 " + (t['token_efficiency']))
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        # 정답당 토큰 사용량
+                        fig = px.bar(
+                            display_df.sort_values('정답당_토큰'),
+                            x='모델',
+                            y='정답당_토큰',
+                            title=t['token_per_correct'],
+                            text='정답당_토큰',
+                            color='정답당_토큰',
+                            color_continuous_scale='RdYlGn_r'
+                        )
+                        fig.update_traces(
+                            texttemplate='%{text:,.0f}',
+                            textposition='outside',
+                            marker_line_color='black',
+                            marker_line_width=1.5
+                        )
+                        fig.update_layout(
+                            height=400,
+                            showlegend=False,
+                            yaxis_title=t['tokens'] + ' / ' + t['correct'],
+                            xaxis_title=t['model']
+                        )
+                        fig.update_xaxes(tickangle=45)
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    with col2:
+                        # 토큰 vs 정확도 산점도
+                        if '평균_토큰' in model_token_stats.columns:
+                            fig = px.scatter(
+                                display_df,
+                                x='평균_토큰',
+                                y='정확도',
+                                size='문제수',
+                                text='모델',
+                                title=t['token_efficiency'] + ' vs ' + t['accuracy'],
+                                labels={
+                                    '평균_토큰': t['avg_tokens_per_problem'],
+                                    '정확도': t['accuracy'] + ' (%)'
+                                }
+                            )
+                            fig.update_traces(
+                                textposition='top center',
+                                marker=dict(
+                                    line=dict(width=2, color='black'),
+                                    opacity=0.7
+                                )
+                            )
+                            fig.update_layout(height=400)
+                            st.plotly_chart(fig, use_container_width=True)
+                
+                st.markdown("---")
+                
+                # 4. 비용 분석 (비용 수준 데이터가 있는 경우)
+                if 'cost' in available_cols:
+                    st.subheader("💵 " + t['cost_analysis'])
+                    
+                    cost_col = available_cols['cost']
+                    
+                    # 비용 수준을 정규화
+                    def normalize_cost_level(level):
+                        if pd.isna(level):
+                            return 'unknown'
+                        level_str = str(level).lower().strip()
+                        if level_str in ['높음', 'high', 'h']:
+                            return t['high']
+                        elif level_str in ['중간', 'medium', 'mid', 'm']:
+                            return t['medium_cost']
+                        elif level_str in ['낮음', 'low', 'l']:
+                            return t['low']
+                        return level
+                    
+                    token_df['비용수준_정규화'] = token_df[cost_col].apply(normalize_cost_level)
+                    model_token_stats['비용수준_정규화'] = model_token_stats['비용수준'].apply(normalize_cost_level) if '비용수준' in model_token_stats.columns else t['medium_cost']
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        # 비용 수준별 모델 분포
+                        cost_dist = token_df.groupby('비용수준_정규화')['모델'].nunique().reset_index()
+                        cost_dist.columns = ['비용수준', '모델수']
+                        
+                        fig = px.pie(
+                            cost_dist,
+                            values='모델수',
+                            names='비용수준',
+                            title=t['cost_level'] + ' ' + ('분포' if lang == 'ko' else 'Distribution'),
+                            hole=0.3
+                        )
+                        fig.update_traces(
+                            textposition='inside',
+                            textinfo='percent+label',
+                            marker=dict(line=dict(color='black', width=2))
+                        )
+                        fig.update_layout(height=400)
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    with col2:
+                        # 비용 수준별 평균 정확도
+                        cost_acc = token_df.groupby('비용수준_정규화')['정답여부'].mean().reset_index()
+                        cost_acc.columns = ['비용수준', '정확도']
+                        cost_acc['정확도'] = cost_acc['정확도'] * 100
+                        
+                        fig = px.bar(
+                            cost_acc,
+                            x='비용수준',
+                            y='정확도',
+                            title=t['cost_level'] + ' vs ' + t['accuracy'],
+                            text='정확도',
+                            color='정확도',
+                            color_continuous_scale='RdYlGn'
+                        )
+                        fig.update_traces(
+                            texttemplate='%{text:.1f}%',
+                            textposition='outside',
+                            marker_line_color='black',
+                            marker_line_width=1.5
+                        )
+                        fig.update_layout(
+                            height=400,
+                            showlegend=False,
+                            yaxis_title=t['accuracy'] + ' (%)',
+                            yaxis=dict(range=[0, 100])
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    st.markdown("---")
+                    
+                    # 비용 효율성 매트릭스
+                    st.subheader("📊 " + t['cost_efficiency'] + (' 매트릭스' if lang == 'ko' else ' Matrix'))
+                    
+                    # 비용 수준과 정확도로 모델 분류
+                    if '비용수준_정규화' in model_token_stats.columns:
+                        fig = px.scatter(
+                            model_token_stats,
+                            x='비용수준_정규화',
+                            y='정확도',
+                            size='총_토큰' if '총_토큰' in model_token_stats.columns else '문제수',
+                            text='모델',
+                            title=t['cost_level'] + ' vs ' + t['accuracy'],
+                            color='정확도',
+                            color_continuous_scale='RdYlGn',
+                            category_orders={'비용수준_정규화': [t['low'], t['medium_cost'], t['high']]}
+                        )
+                        fig.update_traces(
+                            textposition='top center',
+                            marker=dict(
+                                line=dict(width=2, color='black'),
+                                opacity=0.7
+                            )
+                        )
+                        fig.update_layout(
+                            height=500,
+                            yaxis=dict(range=[0, 100])
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # 인사이트
+                        st.info(f"""
+                        💡 **{t['cost_efficiency']} {'인사이트' if lang == 'ko' else 'Insights'}**:
+                        - **{'고효율 영역' if lang == 'ko' else 'High Efficiency Zone'}** ({'낮은 비용 + 높은 정확도' if lang == 'ko' else 'Low cost + High accuracy'}): {'좌측 상단' if lang == 'ko' else 'Top left'}
+                        - **{'고비용 영역' if lang == 'ko' else 'High Cost Zone'}** ({'높은 비용' if lang == 'ko' else 'High cost'}): {'우측' if lang == 'ko' else 'Right side'}
+                        - {'모델 선택 시 비용 대비 성능을 고려하세요' if lang == 'ko' else 'Consider cost-performance ratio when selecting models'}
+                        """)
+                
+                st.markdown("---")
+                
+                # 5. 테스트별 토큰 분석 (테스트가 여러 개인 경우)
+                if '테스트명' in token_df.columns and token_df['테스트명'].nunique() > 1:
+                    st.subheader("📚 " + ("테스트별 토큰 사용량" if lang == 'ko' else "Token Usage by Test"))
+                    
+                    token_col = available_cols.get('total', available_cols.get('input', list(available_cols.values())[0]))
+                    test_token = token_df.groupby(['모델', '테스트명'])[token_col].sum().reset_index()
+                    test_token.columns = ['모델', '테스트명', '총토큰']
+                    
+                    fig = px.bar(
+                        test_token,
+                        x='테스트명',
+                        y='총토큰',
+                        color='모델',
+                        barmode='group',
+                        title='테스트별 모델 토큰 사용량' if lang == 'ko' else 'Token Usage by Test and Model',
+                        labels={'총토큰': t['total_tokens']}
+                    )
+                    fig.update_layout(
+                        height=400,
+                        xaxis_title=t['testname'],
+                        yaxis_title=t['total_tokens']
+                    )
+                    fig.update_xaxes(tickangle=45)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                st.markdown("---")
+                
+                # 6. 문제 유형별 토큰 분석 (이미지 문제가 있는 경우)
+                if 'image' in token_df.columns:
+                    st.subheader("🖼️ " + ("문제 유형별 토큰 사용량" if lang == 'ko' else "Token Usage by Problem Type"))
+                    
+                    # 이미지 문제 여부 구분
+                    token_df['문제유형'] = token_df['image'].apply(
+                        lambda x: t['text_only'] if str(x).lower() == 'text_only' or str(x) == 'X' else t['image_problem']
+                    )
+                    
+                    token_col = available_cols.get('total', available_cols.get('input', list(available_cols.values())[0]))
+                    problem_type_token = token_df.groupby(['모델', '문제유형']).agg({
+                        token_col: 'mean',
+                        '정답여부': 'mean'
+                    }).reset_index()
+                    problem_type_token.columns = ['모델', '문제유형', '평균토큰', '정확도']
+                    problem_type_token['정확도'] = problem_type_token['정확도'] * 100
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        # 문제 유형별 평균 토큰
+                        fig = px.bar(
+                            problem_type_token,
+                            x='모델',
+                            y='평균토큰',
+                            color='문제유형',
+                            barmode='group',
+                            title=t['avg_tokens_per_problem'] + ' (' + t['problem_type'] + '별)',
+                            labels={'평균토큰': t['avg_tokens_per_problem']}
+                        )
+                        fig.update_layout(
+                            height=400,
+                            xaxis_title=t['model']
+                        )
+                        fig.update_xaxes(tickangle=45)
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    with col2:
+                        # 문제 유형별 정확도 비교
+                        fig = px.bar(
+                            problem_type_token,
+                            x='모델',
+                            y='정확도',
+                            color='문제유형',
+                            barmode='group',
+                            title=t['accuracy'] + ' (' + t['problem_type'] + '별)',
+                            labels={'정확도': t['accuracy'] + ' (%)'}
+                        )
+                        fig.update_layout(
+                            height=400,
+                            xaxis_title=t['model'],
+                            yaxis=dict(range=[0, 100])
+                        )
+                        fig.update_xaxes(tickangle=45)
+                        st.plotly_chart(fig, use_container_width=True)
+    
+    # 탭 10: 테스트셋 통계
+    with tabs[9]:
         st.header(f"📋 {t['testset_stats']}")
         
         if selected_tests:
@@ -2606,6 +3158,7 @@ def main():
     st.sidebar.markdown(f"### 📌 {t['help']}")
     st.sidebar.markdown(f"""
     **{t['new_features']}:**
+    - ✨ **{t['token_cost_analysis']}**: 토큰 사용량 및 비용 효율성 분석
     - ✨ **{t['session']} {t['filters']}**: {t['session_filter']}
     - ✨ **{t['incorrect_analysis']}**: {t['incorrect_pattern']}
     - ✨ **{t['difficulty_analysis']}**: {t['difficulty_comparison']}

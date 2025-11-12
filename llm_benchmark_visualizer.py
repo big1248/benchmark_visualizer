@@ -2916,6 +2916,13 @@ def main():
                     
                     cost_col = available_cols['cost']
                     
+                    # 🔍 디버깅 정보 (펼치기/접기)
+                    with st.expander("🔍 " + ("비용 데이터 확인" if lang == 'ko' else "Check Cost Data")):
+                        st.write("**" + ("원본 비용 수준 값" if lang == 'ko' else "Original Cost Level Values") + ":**")
+                        original_values = filtered_df[cost_col].unique().tolist()
+                        st.write(f"고유 값: {original_values}")
+                        st.write(f"개수: {len(original_values)}")
+                    
                     # 비용 수준을 정규화 및 순서 정의
                     def normalize_cost_level(level):
                         if pd.isna(level):
@@ -2943,6 +2950,19 @@ def main():
                     
                     token_df['비용수준_정규화'] = token_df[cost_col].apply(normalize_cost_level)
                     model_token_stats['비용수준_정규화'] = model_token_stats['비용수준'].apply(normalize_cost_level) if '비용수준' in model_token_stats.columns else t['medium_cost']
+                    
+                    # 🔍 정규화 후 값 확인
+                    with st.expander("🔍 " + ("정규화 후 비용 수준 값" if lang == 'ko' else "Normalized Cost Level Values")):
+                        normalized_values = token_df['비용수준_정규화'].unique().tolist()
+                        st.write(f"**정규화된 고유 값**: {normalized_values}")
+                        st.write(f"**정의된 순서 (cost_order)**: {cost_order}")
+                        
+                        # 순서에 없는 값 확인
+                        unexpected = [v for v in normalized_values if v not in cost_order]
+                        if unexpected:
+                            st.warning(f"⚠️ 정의된 순서에 없는 값: {unexpected}")
+                        else:
+                            st.success("✅ 모든 값이 정의된 순서에 포함됨")
                     
                     # 🆕 실제 비용 계산 기능 추가
                     st.markdown("---")
@@ -3183,13 +3203,18 @@ def main():
                         cost_dist = token_df.groupby('비용수준_정규화')['모델'].nunique().reset_index()
                         cost_dist.columns = ['비용수준', '모델수']
                         
+                        # cost_order에 있는 값만 필터링
+                        cost_dist = cost_dist[cost_dist['비용수준'].isin(cost_order)]
+                        
+                        # 문자열로 명시적 변환
+                        cost_dist['비용수준'] = cost_dist['비용수준'].astype(str)
+                        
                         fig = px.pie(
                             cost_dist,
                             values='모델수',
                             names='비용수준',
                             title=t['cost_level'] + ' ' + ('분포' if lang == 'ko' else 'Distribution'),
-                            hole=0.3,
-                            category_orders={'비용수준': cost_order}
+                            hole=0.3
                         )
                         fig.update_traces(
                             textposition='inside',
@@ -3205,6 +3230,12 @@ def main():
                         cost_acc.columns = ['비용수준', '정확도']
                         cost_acc['정확도'] = cost_acc['정확도'] * 100
                         
+                        # cost_order에 있는 값만 필터링
+                        cost_acc = cost_acc[cost_acc['비용수준'].isin(cost_order)]
+                        
+                        # 문자열로 명시적 변환
+                        cost_acc['비용수준'] = cost_acc['비용수준'].astype(str)
+                        
                         fig = px.bar(
                             cost_acc,
                             x='비용수준',
@@ -3212,8 +3243,7 @@ def main():
                             title=t['cost_level'] + ' vs ' + t['accuracy'],
                             text='정확도',
                             color='정확도',
-                            color_continuous_scale='RdYlGn',
-                            category_orders={'비용수준': cost_order}
+                            color_continuous_scale='RdYlGn'
                         )
                         fig.update_traces(
                             texttemplate='%{text:.1f}%',
@@ -3240,8 +3270,14 @@ def main():
                     
                     # 비용 수준과 정확도로 모델 분류
                     if '비용수준_정규화' in model_token_stats.columns:
-                        # 데이터 준비 (Categorical 변환 제거)
+                        # 데이터 준비 및 필터링
                         plot_data = model_token_stats.copy()
+                        
+                        # cost_order에 있는 값만 필터링
+                        plot_data = plot_data[plot_data['비용수준_정규화'].isin(cost_order)]
+                        
+                        # 비용수준을 문자열로 명시적 변환
+                        plot_data['비용수준_정규화'] = plot_data['비용수준_정규화'].astype(str)
                         
                         fig = px.scatter(
                             plot_data,
@@ -3251,8 +3287,7 @@ def main():
                             text='모델',
                             title=t['cost_level'] + ' vs ' + t['accuracy'],
                             color='정확도',
-                            color_continuous_scale='RdYlGn',
-                            category_orders={'비용수준_정규화': cost_order}
+                            color_continuous_scale='RdYlGn'
                         )
                         fig.update_traces(
                             textposition='top center',

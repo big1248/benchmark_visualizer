@@ -3183,12 +3183,17 @@ def main():
                         cost_dist = token_df.groupby('비용수준_정규화')['모델'].nunique().reset_index()
                         cost_dist.columns = ['비용수준', '모델수']
                         
+                        # 순서대로 정렬
+                        cost_dist['비용수준'] = pd.Categorical(cost_dist['비용수준'], categories=cost_order, ordered=True)
+                        cost_dist = cost_dist.sort_values('비용수준')
+                        
                         fig = px.pie(
                             cost_dist,
                             values='모델수',
                             names='비용수준',
                             title=t['cost_level'] + ' ' + ('분포' if lang == 'ko' else 'Distribution'),
-                            hole=0.3
+                            hole=0.3,
+                            category_orders={'비용수준': cost_order}
                         )
                         fig.update_traces(
                             textposition='inside',
@@ -3203,6 +3208,10 @@ def main():
                         cost_acc = token_df.groupby('비용수준_정규화')['정답여부'].mean().reset_index()
                         cost_acc.columns = ['비용수준', '정확도']
                         cost_acc['정확도'] = cost_acc['정확도'] * 100
+                        
+                        # 순서대로 정렬
+                        cost_acc['비용수준'] = pd.Categorical(cost_acc['비용수준'], categories=cost_order, ordered=True)
+                        cost_acc = cost_acc.sort_values('비용수준')
                         
                         fig = px.bar(
                             cost_acc,
@@ -3235,11 +3244,20 @@ def main():
                     
                     # 비용 수준과 정확도로 모델 분류
                     if '비용수준_정규화' in model_token_stats.columns:
+                        # 데이터 준비 및 순서 적용
+                        plot_data = model_token_stats.copy()
+                        plot_data['비용수준_정규화'] = pd.Categorical(
+                            plot_data['비용수준_정규화'], 
+                            categories=cost_order, 
+                            ordered=True
+                        )
+                        plot_data = plot_data.sort_values('비용수준_정규화')
+                        
                         fig = px.scatter(
-                            model_token_stats,
+                            plot_data,
                             x='비용수준_정규화',
                             y='정확도',
-                            size='총_토큰' if '총_토큰' in model_token_stats.columns else '문제수',
+                            size='총_토큰' if '총_토큰' in plot_data.columns else '문제수',
                             text='모델',
                             title=t['cost_level'] + ' vs ' + t['accuracy'],
                             color='정확도',
@@ -3255,7 +3273,9 @@ def main():
                         )
                         fig.update_layout(
                             height=500,
-                            yaxis=dict(range=[0, 100])
+                            yaxis=dict(range=[0, 100]),
+                            xaxis_title=t['cost_level'],
+                            yaxis_title=t['accuracy'] + ' (%)'
                         )
                         st.plotly_chart(fig, use_container_width=True)
                         

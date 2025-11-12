@@ -3183,10 +3183,6 @@ def main():
                         cost_dist = token_df.groupby('비용수준_정규화')['모델'].nunique().reset_index()
                         cost_dist.columns = ['비용수준', '모델수']
                         
-                        # 순서대로 정렬
-                        cost_dist['비용수준'] = pd.Categorical(cost_dist['비용수준'], categories=cost_order, ordered=True)
-                        cost_dist = cost_dist.sort_values('비용수준')
-                        
                         fig = px.pie(
                             cost_dist,
                             values='모델수',
@@ -3209,10 +3205,6 @@ def main():
                         cost_acc.columns = ['비용수준', '정확도']
                         cost_acc['정확도'] = cost_acc['정확도'] * 100
                         
-                        # 순서대로 정렬
-                        cost_acc['비용수준'] = pd.Categorical(cost_acc['비용수준'], categories=cost_order, ordered=True)
-                        cost_acc = cost_acc.sort_values('비용수준')
-                        
                         fig = px.bar(
                             cost_acc,
                             x='비용수준',
@@ -3233,7 +3225,11 @@ def main():
                             height=400,
                             showlegend=False,
                             yaxis_title=t['accuracy'] + ' (%)',
-                            yaxis=dict(range=[0, 100])
+                            yaxis=dict(range=[0, 100]),
+                            xaxis=dict(
+                                categoryorder='array',
+                                categoryarray=cost_order
+                            )
                         )
                         st.plotly_chart(fig, use_container_width=True)
                     
@@ -3244,14 +3240,8 @@ def main():
                     
                     # 비용 수준과 정확도로 모델 분류
                     if '비용수준_정규화' in model_token_stats.columns:
-                        # 데이터 준비 및 순서 적용
+                        # 데이터 준비 (Categorical 변환 제거)
                         plot_data = model_token_stats.copy()
-                        plot_data['비용수준_정규화'] = pd.Categorical(
-                            plot_data['비용수준_정규화'], 
-                            categories=cost_order, 
-                            ordered=True
-                        )
-                        plot_data = plot_data.sort_values('비용수준_정규화')
                         
                         fig = px.scatter(
                             plot_data,
@@ -3274,7 +3264,11 @@ def main():
                         fig.update_layout(
                             height=500,
                             yaxis=dict(range=[0, 100]),
-                            xaxis_title=t['cost_level'],
+                            xaxis=dict(
+                                title=t['cost_level'],
+                                categoryorder='array',
+                                categoryarray=cost_order
+                            ),
                             yaxis_title=t['accuracy'] + ' (%)'
                         )
                         st.plotly_chart(fig, use_container_width=True)

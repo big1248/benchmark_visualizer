@@ -203,7 +203,14 @@ LANGUAGES = {
         'high': '높음',
         'medium_cost': '중간',
         'low': '낮음',
+        'very_low': '매우낮음',
+        'free': '무료',
         'cost': '비용',
+        'actual_cost': '실제 비용',
+        'estimated_cost': '예상 비용',
+        'cost_per_1k_tokens': '1K 토큰당 비용',
+        'total_estimated_cost': '총 예상 비용',
+        'usd': '달러',
     },
     'en': {
         'title': 'LLM Benchmark Results Visualization Tool',
@@ -335,7 +342,14 @@ LANGUAGES = {
         'high': 'High',
         'medium_cost': 'Medium',
         'low': 'Low',
+        'very_low': 'Very Low',
+        'free': 'Free',
         'cost': 'cost',
+        'actual_cost': 'Actual Cost',
+        'estimated_cost': 'Estimated Cost',
+        'cost_per_1k_tokens': 'Cost per 1K Tokens',
+        'total_estimated_cost': 'Total Estimated Cost',
+        'usd': 'USD',
     }
 }
 
@@ -2902,21 +2916,265 @@ def main():
                     
                     cost_col = available_cols['cost']
                     
-                    # 비용 수준을 정규화
+                    # 비용 수준을 정규화 및 순서 정의
                     def normalize_cost_level(level):
                         if pd.isna(level):
                             return 'unknown'
                         level_str = str(level).lower().strip()
-                        if level_str in ['높음', 'high', 'h']:
-                            return t['high']
-                        elif level_str in ['중간', 'medium', 'mid', 'm']:
-                            return t['medium_cost']
+                        # 무료/로컬 모델
+                        if level_str in ['무료', 'free', 'f', '0', 'local', 'localhost', '로컬']:
+                            return t['free']
+                        # 매우 낮음
+                        elif level_str in ['매우낮음', 'very low', 'very_low', 'vl', 'verylow']:
+                            return t['very_low']
+                        # 낮음
                         elif level_str in ['낮음', 'low', 'l']:
                             return t['low']
+                        # 중간
+                        elif level_str in ['중간', 'medium', 'mid', 'm']:
+                            return t['medium_cost']
+                        # 높음
+                        elif level_str in ['높음', 'high', 'h']:
+                            return t['high']
                         return level
+                    
+                    # 비용 순서 정의 (무료 → 매우낮음 → 낮음 → 중간 → 높음)
+                    cost_order = [t['free'], t['very_low'], t['low'], t['medium_cost'], t['high']]
                     
                     token_df['비용수준_정규화'] = token_df[cost_col].apply(normalize_cost_level)
                     model_token_stats['비용수준_정규화'] = model_token_stats['비용수준'].apply(normalize_cost_level) if '비용수준' in model_token_stats.columns else t['medium_cost']
+                    
+                    # 🆕 실제 비용 계산 기능 추가
+                    st.markdown("---")
+                    st.subheader("💰 " + t['actual_cost'] + " " + ('계산기' if lang == 'ko' else 'Calculator'))
+                    
+                    # 모델별 API 가격 정의 (2024-2025 기준, USD per 1M tokens)
+                    MODEL_PRICING = {
+                        # OpenAI
+                        'GPT-4o': {'input': 2.50, 'output': 10.00},
+                        'GPT-4o-Mini': {'input': 0.150, 'output': 0.600},
+                        'GPT-4-Turbo': {'input': 10.00, 'output': 30.00},
+                        'GPT-3.5-Turbo': {'input': 0.50, 'output': 1.50},
+                        # Anthropic
+                        'Claude-3.5-Sonnet': {'input': 3.00, 'output': 15.00},
+                        'Claude-Sonnet-4': {'input': 3.00, 'output': 15.00},
+                        'Claude-3.5-Haiku': {'input': 0.80, 'output': 4.00},
+                        'Claude-3-Opus': {'input': 15.00, 'output': 75.00},
+                        'Claude-3-Sonnet': {'input': 3.00, 'output': 15.00},
+                        'Claude-3-Haiku': {'input': 0.25, 'output': 1.25},
+                        # Google
+                        'Gemini-1.5-Pro': {'input': 1.25, 'output': 5.00},
+                        'Gemini-1.5-Flash': {'input': 0.075, 'output': 0.30},
+                        # LG AI Research
+                        'EXAONE-3.5': {'input': 0.00, 'output': 0.00},  # 로컬/무료
+                    }
+                    
+                    # 가격 정보 표시
+                    with st.expander("📋 " + ("모델별 API 가격 정보 (2024-2025)" if lang == 'ko' else "API Pricing by Model (2024-2025)")):
+                        pricing_data = []
+                        for model, prices in MODEL_PRICING.items():
+                            pricing_data.append({
+                                '모델' if lang == 'ko' else 'Model': model,
+                                '입력 ($/1M)' if lang == 'ko' else 'Input ($/1M)': f"${prices['input']:.3f}",
+                                '출력 ($/1M)' if lang == 'ko' else 'Output ($/1M)': f"${prices['output']:.3f}"
+                            })
+                        st.dataframe(pd.DataFrame(pricing_data), use_container_width=True)
+                        st.caption("💡 " + ("가격은 변동될 수 있습니다. 최신 가격은 각 제공업체 웹사이트를 확인하세요." if lang == 'ko' else "Prices may vary. Check provider websites for latest pricing."))
+                    
+                    # 실제 비용 계산
+                    if '총_입력토큰' in model_token_stats.columns and '총_출력토큰' in model_token_stats.columns:
+                        st.markdown("---")
+                        
+                        cost_calculations = []
+                        for _, row in model_token_stats.iterrows():
+                            model = row['모델']
+                            input_tokens = row['총_입력토큰']
+                            output_tokens = row['총_출력토큰']
+                            
+                            # 모델명 매칭 (부분 매칭)
+                            matched_pricing = None
+                            for price_model, pricing in MODEL_PRICING.items():
+                                if price_model.replace('-', '').replace('.', '').lower() in model.replace('-', '').replace('.', '').lower():
+                                    matched_pricing = pricing
+                                    break
+                            
+                            if matched_pricing:
+                                # 비용 계산 (USD)
+                                input_cost = (input_tokens / 1_000_000) * matched_pricing['input']
+                                output_cost = (output_tokens / 1_000_000) * matched_pricing['output']
+                                total_cost = input_cost + output_cost
+                                
+                                # 문제당 비용
+                                cost_per_problem = total_cost / row['문제수'] if row['문제수'] > 0 else 0
+                                
+                                # 정답당 비용 (효율성 지표)
+                                correct_answers = row['문제수'] * row['정확도'] / 100
+                                cost_per_correct = total_cost / correct_answers if correct_answers > 0 else 0
+                                
+                                cost_calculations.append({
+                                    '모델' if lang == 'ko' else 'Model': model,
+                                    '총비용 ($)' if lang == 'ko' else 'Total Cost ($)': total_cost,
+                                    '문제당 ($)' if lang == 'ko' else 'Per Problem ($)': cost_per_problem,
+                                    '정답당 ($)' if lang == 'ko' else 'Per Correct ($)': cost_per_correct,
+                                    '정확도 (%)' if lang == 'ko' else 'Accuracy (%)': row['정확도'],
+                                    '입력비용 ($)' if lang == 'ko' else 'Input Cost ($)': input_cost,
+                                    '출력비용 ($)' if lang == 'ko' else 'Output Cost ($)': output_cost
+                                })
+                        
+                        if cost_calculations:
+                            cost_df = pd.DataFrame(cost_calculations)
+                            
+                            # 비용 효율성으로 정렬 (정답당 비용 기준)
+                            cost_df = cost_df.sort_values('정답당 ($)' if lang == 'ko' else 'Per Correct ($)')
+                            
+                            st.subheader("💵 " + t['actual_cost'] + " " + ('분석' if lang == 'ko' else 'Analysis'))
+                            
+                            # 주요 메트릭
+                            col1, col2, col3, col4 = st.columns(4)
+                            
+                            with col1:
+                                total_cost_all = cost_df['총비용 ($)' if lang == 'ko' else 'Total Cost ($)'].sum()
+                                st.metric(
+                                    t['total_estimated_cost'],
+                                    f"${total_cost_all:.4f}"
+                                )
+                            
+                            with col2:
+                                avg_cost_per_problem = cost_df['문제당 ($)' if lang == 'ko' else 'Per Problem ($)'].mean()
+                                st.metric(
+                                    t['cost_per_problem'],
+                                    f"${avg_cost_per_problem:.6f}"
+                                )
+                            
+                            with col3:
+                                # 가장 비용 효율적인 모델
+                                most_efficient = cost_df.iloc[0]
+                                st.metric(
+                                    '최고 효율' if lang == 'ko' else 'Most Efficient',
+                                    most_efficient['모델' if lang == 'ko' else 'Model'],
+                                    f"${most_efficient['정답당 ($)' if lang == 'ko' else 'Per Correct ($)']:.6f}"
+                                )
+                            
+                            with col4:
+                                # 가장 비용 비효율적인 모델
+                                least_efficient = cost_df.iloc[-1]
+                                st.metric(
+                                    '최저 효율' if lang == 'ko' else 'Least Efficient',
+                                    least_efficient['모델' if lang == 'ko' else 'Model'],
+                                    f"${least_efficient['정답당 ($)' if lang == 'ko' else 'Per Correct ($)']:.6f}"
+                                )
+                            
+                            # 상세 테이블
+                            st.markdown("---")
+                            st.dataframe(
+                                cost_df.style.format({
+                                    '총비용 ($)' if lang == 'ko' else 'Total Cost ($)': '${:.6f}',
+                                    '문제당 ($)' if lang == 'ko' else 'Per Problem ($)': '${:.8f}',
+                                    '정답당 ($)' if lang == 'ko' else 'Per Correct ($)': '${:.8f}',
+                                    '정확도 (%)' if lang == 'ko' else 'Accuracy (%)': '{:.2f}%',
+                                    '입력비용 ($)' if lang == 'ko' else 'Input Cost ($)': '${:.6f}',
+                                    '출력비용 ($)' if lang == 'ko' else 'Output Cost ($)': '${:.6f}'
+                                }).background_gradient(
+                                    subset=['정답당 ($)' if lang == 'ko' else 'Per Correct ($)'],
+                                    cmap='RdYlGn_r'
+                                ),
+                                use_container_width=True
+                            )
+                            
+                            st.markdown("---")
+                            
+                            # 비용 시각화
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                # 총 비용 비교
+                                fig = px.bar(
+                                    cost_df,
+                                    x='모델' if lang == 'ko' else 'Model',
+                                    y='총비용 ($)' if lang == 'ko' else 'Total Cost ($)',
+                                    title=t['total_estimated_cost'],
+                                    text='총비용 ($)' if lang == 'ko' else 'Total Cost ($)',
+                                    color='총비용 ($)' if lang == 'ko' else 'Total Cost ($)',
+                                    color_continuous_scale='Reds'
+                                )
+                                fig.update_traces(
+                                    texttemplate='$%{text:.6f}',
+                                    textposition='outside',
+                                    marker_line_color='black',
+                                    marker_line_width=1.5
+                                )
+                                fig.update_layout(
+                                    height=400,
+                                    showlegend=False,
+                                    yaxis_title=t['cost'] + ' (USD)',
+                                    xaxis_title=t['model']
+                                )
+                                fig.update_xaxes(tickangle=45)
+                                st.plotly_chart(fig, use_container_width=True)
+                            
+                            with col2:
+                                # 정답당 비용 (효율성)
+                                fig = px.bar(
+                                    cost_df.sort_values('정답당 ($)' if lang == 'ko' else 'Per Correct ($)'),
+                                    x='모델' if lang == 'ko' else 'Model',
+                                    y='정답당 ($)' if lang == 'ko' else 'Per Correct ($)',
+                                    title=t['cost_efficiency'] + ' (' + ('정답당 비용' if lang == 'ko' else 'Cost per Correct') + ')',
+                                    text='정답당 ($)' if lang == 'ko' else 'Per Correct ($)',
+                                    color='정답당 ($)' if lang == 'ko' else 'Per Correct ($)',
+                                    color_continuous_scale='RdYlGn_r'
+                                )
+                                fig.update_traces(
+                                    texttemplate='$%{text:.8f}',
+                                    textposition='outside',
+                                    marker_line_color='black',
+                                    marker_line_width=1.5
+                                )
+                                fig.update_layout(
+                                    height=400,
+                                    showlegend=False,
+                                    yaxis_title=t['cost'] + ' (USD)',
+                                    xaxis_title=t['model']
+                                )
+                                fig.update_xaxes(tickangle=45)
+                                st.plotly_chart(fig, use_container_width=True)
+                            
+                            st.markdown("---")
+                            
+                            # 비용 vs 정확도 산점도
+                            fig = px.scatter(
+                                cost_df,
+                                x='총비용 ($)' if lang == 'ko' else 'Total Cost ($)',
+                                y='정확도 (%)' if lang == 'ko' else 'Accuracy (%)',
+                                text='모델' if lang == 'ko' else 'Model',
+                                title=t['cost'] + ' vs ' + t['accuracy'],
+                                color='정확도 (%)' if lang == 'ko' else 'Accuracy (%)',
+                                color_continuous_scale='RdYlGn',
+                                size='문제당 ($)' if lang == 'ko' else 'Per Problem ($)'
+                            )
+                            fig.update_traces(
+                                textposition='top center',
+                                marker=dict(
+                                    line=dict(width=2, color='black'),
+                                    opacity=0.7
+                                )
+                            )
+                            fig.update_layout(
+                                height=500,
+                                yaxis=dict(range=[0, 100])
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # 인사이트
+                            st.success(f"""
+                            💡 **{t['cost_efficiency']} {'인사이트' if lang == 'ko' else 'Insights'}**:
+                            - **{'최고 효율' if lang == 'ko' else 'Most Efficient'}**: {most_efficient['모델' if lang == 'ko' else 'Model']} (${most_efficient['정답당 ($)' if lang == 'ko' else 'Per Correct ($)']:.8f} / {'정답' if lang == 'ko' else 'correct'})
+                            - **{'최저 효율' if lang == 'ko' else 'Least Efficient'}**: {least_efficient['모델' if lang == 'ko' else 'Model']} (${least_efficient['정답당 ($)' if lang == 'ko' else 'Per Correct ($)']:.8f} / {'정답' if lang == 'ko' else 'correct'})
+                            - **{'효율 차이' if lang == 'ko' else 'Efficiency Gap'}**: {(least_efficient['정답당 ($)' if lang == 'ko' else 'Per Correct ($)'] / most_efficient['정답당 ($)' if lang == 'ko' else 'Per Correct ($)']):.1f}x
+                            """)
+                        else:
+                            st.info("💡 " + ("현재 데이터의 모델들에 대한 가격 정보가 없습니다. 모델명을 확인하거나 가격 정보를 추가하세요." if lang == 'ko' else "No pricing information available for current models. Please check model names or add pricing info."))
+                    
+                    st.markdown("---")
                     
                     col1, col2 = st.columns(2)
                     
@@ -2953,7 +3211,8 @@ def main():
                             title=t['cost_level'] + ' vs ' + t['accuracy'],
                             text='정확도',
                             color='정확도',
-                            color_continuous_scale='RdYlGn'
+                            color_continuous_scale='RdYlGn',
+                            category_orders={'비용수준': cost_order}
                         )
                         fig.update_traces(
                             texttemplate='%{text:.1f}%',
@@ -2985,7 +3244,7 @@ def main():
                             title=t['cost_level'] + ' vs ' + t['accuracy'],
                             color='정확도',
                             color_continuous_scale='RdYlGn',
-                            category_orders={'비용수준_정규화': [t['low'], t['medium_cost'], t['high']]}
+                            category_orders={'비용수준_정규화': cost_order}
                         )
                         fig.update_traces(
                             textposition='top center',

@@ -1129,25 +1129,28 @@ def main():
             st.markdown("---")
             st.subheader("⚖️ " + ("법령/비법령 분석" if lang == 'ko' else "Law/Non-Law Analysis"))
             
-            # 테스트셋 기반으로 법령/비법령 문제 수 계산
-            law_count_testset = 0
-            non_law_count_testset = 0
+            # 🔥 일관성을 위해 항상 테스트셋 기반으로 법령/비법령 문제 수 계산
+            law_count = 0
+            non_law_count = 0
             
             if selected_tests:
                 for test_name in selected_tests:
-                    if test_name in testsets and 'law' in testsets[test_name].columns:
+                    if test_name in testsets:
                         test_df = testsets[test_name]
-                        law_count_testset += len(test_df[test_df['law'] == 'O'])
-                        non_law_count_testset += len(test_df[test_df['law'] != 'O'])
-            
-            # 백업: filtered_df에서 계산 (테스트셋이 없는 경우)
-            unique_problems = filtered_df[['Question', 'law']].drop_duplicates()
-            law_count_backup = len(unique_problems[unique_problems['law'] == 'O'])
-            non_law_count_backup = len(unique_problems[unique_problems['law'] != 'O'])
-            
-            # 테스트셋 값이 있으면 사용, 없으면 백업 사용
-            law_count = law_count_testset if law_count_testset > 0 else law_count_backup
-            non_law_count = non_law_count_testset if non_law_count_testset > 0 else non_law_count_backup
+                        if 'law' in test_df.columns:
+                            law_count += len(test_df[test_df['law'] == 'O'])
+                            non_law_count += len(test_df[test_df['law'] != 'O'])
+                        else:
+                            # law 컬럼이 없으면 전체를 비법령으로 간주
+                            non_law_count += len(test_df)
+            else:
+                # 선택된 테스트가 없으면 모든 테스트셋 합산
+                for test_name, test_df in testsets.items():
+                    if 'law' in test_df.columns:
+                        law_count += len(test_df[test_df['law'] == 'O'])
+                        non_law_count += len(test_df[test_df['law'] != 'O'])
+                    else:
+                        non_law_count += len(test_df)
             
             # 법령/비법령 정답률 (모든 모델 평균)
             law_df = filtered_df[filtered_df['law'] == 'O']
@@ -2138,9 +2141,24 @@ def main():
                         
                         # 정답 표시
                         if 'Answer' in q_detail and pd.notna(q_detail['Answer']):
-                            st.write(f"**정답/Answer:** {q_detail['Answer']}")
+                            st.write(f"**✅ 정답/Answer:** {q_detail['Answer']}")
                         
-                        st.write(f"**오답 모델/Incorrect Models:** {row['incorrect_models']}")
+                        # 🔥 모델별 선택 답안 상세 표시
+                        st.markdown("---")
+                        st.write(f"**❌ 모델별 오답 내역:**" if lang == 'ko' else "**❌ Incorrect Answers by Model:**")
+                        
+                        incorrect_details = filtered_df[
+                            (filtered_df['Question'] == row['Question']) & 
+                            (filtered_df['정답여부'] == False)
+                        ][['모델', '예측답', 'Answer']].drop_duplicates()
+                        
+                        for _, detail in incorrect_details.iterrows():
+                            model = detail['모델']
+                            predicted = detail['예측답'] if pd.notna(detail['예측답']) else 'N/A'
+                            correct = detail['Answer'] if pd.notna(detail['Answer']) else 'N/A'
+                            st.write(f"  • **{model}**: 선택 {predicted} (정답: {correct})" if lang == 'ko' 
+                                   else f"  • **{model}**: Selected {predicted} (Correct: {correct})")
+
         else:
             st.info("No problems that all models got wrong.")
         
@@ -2191,10 +2209,38 @@ def main():
                         
                         # 정답 표시
                         if 'Answer' in q_detail and pd.notna(q_detail['Answer']):
-                            st.write(f"**정답/Answer:** {q_detail['Answer']}")
+                            st.write(f"**✅ 정답/Answer:** {q_detail['Answer']}")
                         
-                        st.write(f"**✓ 정답 모델/Correct Models:** {row['correct_models']}")
-                        st.write(f"**✗ 오답 모델/Incorrect Models:** {row['incorrect_models']}")
+                        st.markdown("---")
+                        
+                        # 🔥 정답 모델과 선택 답안
+                        if row['correct_count'] > 0:
+                            st.write(f"**✓ 정답 모델:**" if lang == 'ko' else "**✓ Correct Models:**")
+                            correct_details = filtered_df[
+                                (filtered_df['Question'] == row['Question']) & 
+                                (filtered_df['정답여부'] == True)
+                            ][['모델', '예측답']].drop_duplicates()
+                            
+                            for _, detail in correct_details.iterrows():
+                                model = detail['모델']
+                                predicted = detail['예측답'] if pd.notna(detail['예측답']) else 'N/A'
+                                st.write(f"  • **{model}**: 선택 {predicted} ✅" if lang == 'ko' 
+                                       else f"  • **{model}**: Selected {predicted} ✅")
+                        
+                        # 🔥 오답 모델과 선택 답안
+                        st.write(f"**✗ 오답 모델:**" if lang == 'ko' else "**✗ Incorrect Models:**")
+                        incorrect_details = filtered_df[
+                            (filtered_df['Question'] == row['Question']) & 
+                            (filtered_df['정답여부'] == False)
+                        ][['모델', '예측답', 'Answer']].drop_duplicates()
+                        
+                        for _, detail in incorrect_details.iterrows():
+                            model = detail['모델']
+                            predicted = detail['예측답'] if pd.notna(detail['예측답']) else 'N/A'
+                            correct = detail['Answer'] if pd.notna(detail['Answer']) else 'N/A'
+                            st.write(f"  • **{model}**: 선택 {predicted} (정답: {correct})" if lang == 'ko' 
+                                   else f"  • **{model}**: Selected {predicted} (Correct: {correct})")
+
         else:
             st.info("No problems that most models got wrong.")
         
@@ -3405,8 +3451,55 @@ def main():
     with tabs[9]:
         st.header(f"📋 {t['testset_stats']}")
         
+        # 상단에 전체 통계 요약 추가
+        st.subheader("📊 " + ("전체 테스트셋 통계" if lang == 'ko' else "Overall Test Set Statistics"))
+        
+        # 선택된 테스트들의 전체 통계
+        total_all_problems = 0
+        total_law_problems = 0
+        total_non_law_problems = 0
+        
         if selected_tests:
-            # 선택된 테스트들의 통계 표시
+            for test_name in selected_tests:
+                if test_name in testsets:
+                    test_df = testsets[test_name]
+                    total_all_problems += len(test_df)
+                    if 'law' in test_df.columns:
+                        total_law_problems += len(test_df[test_df['law'] == 'O'])
+                        total_non_law_problems += len(test_df[test_df['law'] != 'O'])
+                    else:
+                        total_non_law_problems += len(test_df)
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(
+                "총 문제 수" if lang == 'ko' else "Total Problems",
+                f"{total_all_problems:,}",
+                help="선택된 모든 테스트의 전체 문제 수 (테스트셋 기준)"
+            )
+        with col2:
+            st.metric(
+                "법령 문제" if lang == 'ko' else "Law Problems",
+                f"{total_law_problems:,}",
+                help="법령 문제 수 (테스트셋 기준)"
+            )
+        with col3:
+            st.metric(
+                "비법령 문제" if lang == 'ko' else "Non-Law Problems",
+                f"{total_non_law_problems:,}",
+                help="비법령 문제 수 (테스트셋 기준)"
+            )
+        
+        st.info("💡 " + (
+            "이 통계는 테스트셋 파일 기준입니다. 전체 요약 탭의 수치와 동일합니다." 
+            if lang == 'ko' 
+            else "These statistics are based on test set files. They match the Overview tab."
+        ))
+        
+        st.markdown("---")
+        
+        if selected_tests:
+            # 선택된 테스트들의 개별 통계 표시
             for test_name in selected_tests:
                 stats = get_testset_statistics(testsets, test_name, lang)
                 if stats:

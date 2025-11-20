@@ -1692,10 +1692,29 @@ def main():
             # 전체 법령/비법령 비율
             st.subheader(t['law_ratio'])
             
-            # 중복 제거한 문제로 계산
-            unique_problems = filtered_df.drop_duplicates(subset=['Question', 'law'])
-            law_count = len(unique_problems[unique_problems['law'] == 'O'])
-            non_law_count = len(unique_problems[unique_problems['law'] != 'O'])
+            # 🔥 테스트셋 기반으로 법령/비법령 문제 수 계산 (전체 요약과 동일)
+            law_count = 0
+            non_law_count = 0
+            
+            if selected_tests:
+                for test_name in selected_tests:
+                    if test_name in testsets:
+                        test_df = testsets[test_name]
+                        if 'law' in test_df.columns:
+                            law_count += len(test_df[test_df['law'] == 'O'])
+                            non_law_count += len(test_df[test_df['law'] != 'O'])
+                        else:
+                            # law 컬럼이 없으면 전체를 비법령으로 간주
+                            non_law_count += len(test_df)
+            else:
+                # 선택된 테스트가 없으면 모든 테스트셋 합산
+                for test_name, test_df in testsets.items():
+                    if 'law' in test_df.columns:
+                        law_count += len(test_df[test_df['law'] == 'O'])
+                        non_law_count += len(test_df[test_df['law'] != 'O'])
+                    else:
+                        non_law_count += len(test_df)
+            
             total_unique = law_count + non_law_count
             
             col1, col2 = st.columns(2)
@@ -1716,8 +1735,22 @@ def main():
             
             with col2:
                 # 수치 표시
-                st.metric(t['law_problems'], f"{law_count} ({law_count/total_unique*100:.1f}%)")
-                st.metric(t['non_law_problems'], f"{non_law_count} ({non_law_count/total_unique*100:.1f}%)")
+                st.metric(
+                    t['law_problems'], 
+                    f"{law_count} ({law_count/total_unique*100:.1f}%)",
+                    help="테스트셋 파일 기준 법령 문제 수"
+                )
+                st.metric(
+                    t['non_law_problems'], 
+                    f"{non_law_count} ({non_law_count/total_unique*100:.1f}%)",
+                    help="테스트셋 파일 기준 비법령 문제 수"
+                )
+            
+            st.info("💡 " + (
+                "이 통계는 테스트셋 파일 기준입니다. 전체 요약 탭과 동일합니다." 
+                if lang == 'ko' 
+                else "These statistics are based on test set files. They match the Overview tab."
+            ))
             
             # 모델별 법령/비법령 성능
             st.markdown("---")

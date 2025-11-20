@@ -1302,26 +1302,35 @@ def main():
             col1, col2 = st.columns(2)
             
             with col1:
-                # 테스트셋별 문제 수
-                test_problem_count = filtered_df.groupby('테스트명')['Question'].nunique().reset_index()
-                test_problem_count.columns = ['테스트명', '문제수']
+                # 🔥 테스트셋별 문제 수 (테스트셋 파일 기준)
+                test_problem_data = []
+                for test_name in selected_tests if selected_tests else testsets.keys():
+                    if test_name in testsets:
+                        problem_count = len(testsets[test_name])
+                        test_problem_data.append({'테스트명': test_name, '문제수': problem_count})
+                
+                test_problem_count = pd.DataFrame(test_problem_data)
                 test_problem_count = test_problem_count.sort_values('문제수', ascending=False)
                 
                 fig = px.bar(
                     test_problem_count,
                     x='테스트명',
                     y='문제수',
-                    title='테스트셋별 문제 수',
+                    title='테스트셋별 문제 수' if lang == 'ko' else 'Problems by Test',
                     text='문제수',
                     color='문제수',
                     color_continuous_scale='Blues'
                 )
-                fig.update_traces(textposition='outside')
+                fig.update_traces(
+                    textposition='outside',
+                    marker_line_color='black',
+                    marker_line_width=1.5
+                )
                 fig.update_layout(
                     height=400,
                     showlegend=False,
-                    yaxis_title='문제 수',
-                    xaxis_title='테스트명'
+                    yaxis_title='문제 수' if lang == 'ko' else 'Problem Count',
+                    xaxis_title='테스트명' if lang == 'ko' else 'Test Name'
                 )
                 fig.update_xaxes(tickangle=45)
                 st.plotly_chart(fig, use_container_width=True)

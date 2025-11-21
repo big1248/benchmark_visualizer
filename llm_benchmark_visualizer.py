@@ -1366,6 +1366,46 @@ def main():
                 )
                 fig.update_xaxes(tickangle=45)
                 st.plotly_chart(fig, use_container_width=True)
+        
+        # 종합 인사이트
+        st.markdown("---")
+        st.subheader("💡 " + ("종합 인사이트" if lang == 'ko' else "Key Insights"))
+        
+        # 최고/최저 성능 모델 찾기
+        best_model = model_acc_df.iloc[0]
+        worst_model = model_acc_df.iloc[-1]
+        performance_gap = best_model[t['accuracy']] - worst_model[t['accuracy']]
+        
+        # 법령 vs 비법령 차이
+        if 'law' in filtered_df.columns and law_count > 0 and non_law_count > 0:
+            law_difficulty = "더 어려움" if law_accuracy < non_law_accuracy else "더 쉬움" if law_accuracy > non_law_accuracy else "비슷함"
+            law_diff_pct = abs(law_accuracy - non_law_accuracy)
+            
+            st.success(f"""
+            📊 **{"성능 분석" if lang == 'ko' else "Performance Analysis"}**:
+            - **{"최고 성능 모델" if lang == 'ko' else "Top Model"}**: {best_model[t['model']]} ({best_model[t['accuracy']]:.2f}%)
+            - **{"최저 성능 모델" if lang == 'ko' else "Lowest Model"}**: {worst_model[t['model']]} ({worst_model[t['accuracy']]:.2f}%)
+            - **{"성능 격차" if lang == 'ko' else "Performance Gap"}**: {performance_gap:.2f}%p
+            
+            ⚖️ **{"법령 문제 분석" if lang == 'ko' else "Law Problem Analysis"}**:
+            - {"법령 문제가" if lang == 'ko' else "Law problems are"} **{law_difficulty}** ({"차이" if lang == 'ko' else "difference"}: {law_diff_pct:.2f}%p)
+            - {"법령 문제 정답률" if lang == 'ko' else "Law accuracy"}: {law_accuracy:.2f}% vs {"비법령" if lang == 'ko' else "Non-law"}: {non_law_accuracy:.2f}%
+            
+            📈 **{"추천 사항" if lang == 'ko' else "Recommendations"}**:
+            - {"높은 정확도가 필요한 경우" if lang == 'ko' else "For high accuracy needs"}: {best_model[t['model']]} {"사용" if lang == 'ko' else "recommended"}
+            - {"법령 문제 특화가 필요한 경우" if lang == 'ko' else "For law-specific tasks"}: {"법령/비법령 분석 탭에서 세부 성능 확인" if lang == 'ko' else "Check detailed performance in Law Analysis tab"}
+            """)
+        else:
+            st.success(f"""
+            📊 **{"성능 분석" if lang == 'ko' else "Performance Analysis"}**:
+            - **{"최고 성능 모델" if lang == 'ko' else "Top Model"}**: {best_model[t['model']]} ({best_model[t['accuracy']]:.2f}%)
+            - **{"최저 성능 모델" if lang == 'ko' else "Lowest Model"}**: {worst_model[t['model']]} ({worst_model[t['accuracy']]:.2f}%)
+            - **{"성능 격차" if lang == 'ko' else "Performance Gap"}**: {performance_gap:.2f}%p
+            
+            📈 **{"추천 사항" if lang == 'ko' else "Recommendations"}**:
+            - {"높은 정확도가 필요한 경우" if lang == 'ko' else "For high accuracy needs"}: {best_model[t['model']]} {"사용 권장" if lang == 'ko' else "recommended"}
+            - {"평균 성능" if lang == 'ko' else "Average performance"}: {avg_accuracy:.2f}% - {"이를 기준으로 모델 선택" if lang == 'ko' else "use as baseline for model selection"}
+            """)
     
     # 탭 2: 모델별 비교
     with tabs[1]:
@@ -1481,6 +1521,15 @@ def main():
             fig.update_layout(height=400)
             fig.update_xaxes(tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
+            
+            # 히트맵 인사이트
+            st.info(f"""
+            💡 **{"히트맵 분석" if lang == 'ko' else "Heatmap Analysis"}**:
+            - **{"가장 어려운 테스트" if lang == 'ko' else "Hardest Test"}**: {heatmap_pivot.mean(axis=0).idxmin()} ({"평균" if lang == 'ko' else "avg"}: {heatmap_pivot.mean(axis=0).min():.1f}%)
+            - **{"가장 쉬운 테스트" if lang == 'ko' else "Easiest Test"}**: {heatmap_pivot.mean(axis=0).idxmax()} ({"평균" if lang == 'ko' else "avg"}: {heatmap_pivot.mean(axis=0).max():.1f}%)
+            - **{"일관성" if lang == 'ko' else "Consistency"}**: {"모든 모델이 비슷한 성능 패턴을 보이는지 확인하세요" if lang == 'ko' else "Check if all models show similar performance patterns"}
+            - **{"특화 영역" if lang == 'ko' else "Specialization"}**: {"특정 모델이 특정 테스트에서 특히 우수한지 파악하세요" if lang == 'ko' else "Identify if specific models excel in certain tests"}
+            """)
     
     # 탭 3: 응답시간 분석
     with tabs[2]:
@@ -1648,12 +1697,25 @@ def main():
                 fig.update_layout(height=500)
                 st.plotly_chart(fig, use_container_width=True)
                 
-                # 인사이트
+                # 인사이트 개선
+                speed_accuracy_ratio = fastest['정확도'] / slowest['정확도'] if slowest['정확도'] > 0 else 0
+                time_ratio = slowest['평균'] / fastest['평균'] if fastest['평균'] > 0 else 0
+                
                 st.info(f"""
-                💡 **인사이트**:
-                - 가장 빠른 모델: **{fastest['모델']}** ({fastest['평균']:.2f}초, 정확도 {fastest['정확도']:.1f}%)
-                - 가장 느린 모델: **{slowest['모델']}** ({slowest['평균']:.2f}초, 정확도 {slowest['정확도']:.1f}%)
-                - 속도와 정확도의 상관관계를 차트에서 확인하세요.
+                💡 **{"속도 vs 정확도 트레이드오프 분석" if lang == 'ko' else "Speed vs Accuracy Trade-off Analysis"}**:
+                
+                🏃 **{"속도" if lang == 'ko' else "Speed"}**:
+                - **{"최고속" if lang == 'ko' else "Fastest"}**: {fastest['모델']} ({fastest['평균']:.2f}{"초" if lang == 'ko' else "s"}, {"정확도" if lang == 'ko' else "accuracy"} {fastest['정확도']:.1f}%)
+                - **{"최저속" if lang == 'ko' else "Slowest"}**: {slowest['모델']} ({slowest['평균']:.2f}{"초" if lang == 'ko' else "s"}, {"정확도" if lang == 'ko' else "accuracy"} {slowest['정확도']:.1f}%)
+                - **{"속도 차이" if lang == 'ko' else "Speed difference"}**: {time_ratio:.1f}x
+                
+                🎯 **{"효율성 분석" if lang == 'ko' else "Efficiency Analysis"}**:
+                - {"빠른 모델이" if lang == 'ko' else "Fast model is"} {speed_accuracy_ratio:.2f}x {"의 정확도를 가짐" if lang == 'ko' else "as accurate"}
+                - **{"권장사항" if lang == 'ko' else "Recommendation"}**: {"실시간 처리가 중요하면" if lang == 'ko' else "For real-time: "}{fastest['모델']}, {"정확도가 중요하면" if lang == 'ko' else "For accuracy: "}{slowest['모델'] if slowest['정확도'] > fastest['정확도'] else fastest['모델']}
+                
+                📊 **{"산점도 활용팁" if lang == 'ko' else "Scatter Plot Insights"}**:
+                - {"왼쪽 위" if lang == 'ko' else "Top-left"}: {"빠르고 정확함 (이상적)" if lang == 'ko' else "Fast & Accurate (ideal)"}
+                - {"오른쪽 아래" if lang == 'ko' else "Bottom-right"}: {"느리고 부정확함 (피해야 함)" if lang == 'ko' else "Slow & Inaccurate (avoid)"}
                 """)
                 
                 st.markdown("---")
@@ -1681,6 +1743,16 @@ def main():
                     )
                     fig.update_xaxes(tickangle=45)
                     st.plotly_chart(fig, use_container_width=True)
+                    
+                    # 테스트별 인사이트
+                    hardest_test = test_time.groupby('테스트명')['평균시간'].mean().idxmax()
+                    easiest_test = test_time.groupby('테스트명')['평균시간'].mean().idxmin()
+                    st.success(f"""
+                    📊 **{"테스트별 처리 시간 분석" if lang == 'ko' else "Processing Time by Test"}**:
+                    - **{"가장 오래 걸리는 테스트" if lang == 'ko' else "Slowest test"}**: {hardest_test} ({"복잡도가 높을 가능성" if lang == 'ko' else "likely more complex"})
+                    - **{"가장 빠른 테스트" if lang == 'ko' else "Fastest test"}**: {easiest_test} ({"상대적으로 단순" if lang == 'ko' else "relatively simpler"})
+                    - **{"참고" if lang == 'ko' else "Note"}**: {"테스트별 처리 시간 차이는 문제 난이도나 길이와 관련" if lang == 'ko' else "Time differences relate to problem difficulty or length"}
+                    """)
     
     # 탭 4: 법령/비법령 분석
     with tabs[3]:
@@ -1797,6 +1869,31 @@ def main():
                 xaxis_title=t['model']
             )
             st.plotly_chart(fig, use_container_width=True)
+            
+            # 법령/비법령 성능 인사이트
+            # 법령에 강한 모델과 비법령에 강한 모델 찾기
+            law_perf_df['법령_우위'] = law_perf_df['법령'] - law_perf_df['비법령']
+            best_law_model = law_perf_df.loc[law_perf_df['법령'].idxmax()]
+            best_nonlaw_model = law_perf_df.loc[law_perf_df['비법령'].idxmax()]
+            most_law_specialized = law_perf_df.loc[law_perf_df['법령_우위'].idxmax()]
+            most_balanced = law_perf_df.loc[law_perf_df['법령_우위'].abs().idxmin()]
+            
+            st.success(f"""
+            💡 **{"법령 문제 특화 분석" if lang == 'ko' else "Law Problem Specialization Analysis"}**:
+            
+            🏆 **{"최고 성능" if lang == 'ko' else "Top Performance"}**:
+            - **{"법령 최고" if lang == 'ko' else "Best at Law"}**: {best_law_model['모델']} ({best_law_model['법령']:.1f}%)
+            - **{"비법령 최고" if lang == 'ko' else "Best at Non-Law"}**: {best_nonlaw_model['모델']} ({best_nonlaw_model['비법령']:.1f}%)
+            
+            ⚖️ **{"균형 vs 특화" if lang == 'ko' else "Balance vs Specialization"}**:
+            - **{"가장 균형잡힌 모델" if lang == 'ko' else "Most Balanced"}**: {most_balanced['모델']} ({"차이" if lang == 'ko' else "diff"}: {abs(most_balanced['법령_우위']):.1f}%p)
+            - **{"법령 특화 모델" if lang == 'ko' else "Law Specialized"}**: {most_law_specialized['모델']} ({"법령" if lang == 'ko' else "law"} +{most_law_specialized['법령_우위']:.1f}%p)
+            
+            📋 **{"활용 가이드" if lang == 'ko' else "Usage Guide"}**:
+            - **{"법률 자문 시스템" if lang == 'ko' else "Legal Advisory"}**: {best_law_model['모델']} {"추천" if lang == 'ko' else "recommended"}
+            - **{"일반 안전 교육" if lang == 'ko' else "General Safety Training"}**: {most_balanced['모델']} {"추천" if lang == 'ko' else "recommended"}
+            - **{"종합 솔루션" if lang == 'ko' else "Comprehensive Solution"}**: {"법령/비법령 모두 높은 모델 선택" if lang == 'ko' else "Choose models high in both areas"}
+            """)
     
     # 탭 5: 과목별 분석
     with tabs[4]:
@@ -1884,6 +1981,44 @@ def main():
             fig.update_layout(height=400)
             fig.update_xaxes(tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
+            
+            # 과목별 성능 인사이트
+            # 과목별 평균 정확도
+            subject_avg = subject_model_pivot.mean(axis=0).sort_values()
+            hardest_subject = subject_avg.index[0]
+            easiest_subject = subject_avg.index[-1]
+            
+            # 모델별 편차 (과목간 성능 일관성)
+            model_consistency = subject_model_pivot.std(axis=1).sort_values()
+            most_consistent = model_consistency.index[0]
+            least_consistent = model_consistency.index[-1]
+            
+            # 특화 모델 찾기
+            subject_specialists = {}
+            for subject in subject_model_pivot.columns:
+                best_model = subject_model_pivot[subject].idxmax()
+                best_score = subject_model_pivot[subject].max()
+                subject_specialists[subject] = (best_model, best_score)
+            
+            st.info(f"""
+            💡 **{"과목별 난이도 및 모델 특화 분석" if lang == 'ko' else "Subject Difficulty & Model Specialization"}**:
+            
+            📚 **{"과목 난이도" if lang == 'ko' else "Subject Difficulty"}**:
+            - **{"가장 어려운 과목" if lang == 'ko' else "Hardest"}**: {hardest_subject} ({"평균" if lang == 'ko' else "avg"}: {subject_avg.iloc[0]:.1f}%)
+            - **{"가장 쉬운 과목" if lang == 'ko' else "Easiest"}**: {easiest_subject} ({"평균" if lang == 'ko' else "avg"}: {subject_avg.iloc[-1]:.1f}%)
+            - **{"난이도 격차" if lang == 'ko' else "Difficulty gap"}**: {subject_avg.iloc[-1] - subject_avg.iloc[0]:.1f}%p
+            
+            🎯 **{"모델 일관성" if lang == 'ko' else "Model Consistency"}**:
+            - **{"가장 일관적" if lang == 'ko' else "Most Consistent"}**: {most_consistent} ({"편차" if lang == 'ko' else "std"}: {model_consistency.iloc[0]:.1f})
+            - **{"가장 불균형" if lang == 'ko' else "Least Consistent"}**: {least_consistent} ({"편차" if lang == 'ko' else "std"}: {model_consistency.iloc[-1]:.1f})
+            
+            🏆 **{"과목별 최고 모델" if lang == 'ko' else "Top Models by Subject"}**:
+            {chr(10).join([f"- **{subj}**: {model} ({score:.1f}%)" for subj, (model, score) in list(subject_specialists.items())[:3]])}
+            
+            💼 **{"활용 제안" if lang == 'ko' else "Recommendations"}**:
+            - **{"특정 과목 교육" if lang == 'ko' else "Subject-specific training"}**: {"해당 과목 최고 성능 모델 활용" if lang == 'ko' else "Use top model for that subject"}
+            - **{"종합 교육" if lang == 'ko' else "Comprehensive education"}**: {most_consistent} {"(균형잡힌 성능)" if lang == 'ko' else "(balanced performance)"}
+            """)
     
     # 탭 6: 연도별 분석
     with tabs[5]:
@@ -2063,6 +2198,44 @@ def main():
                 ))
                 fig.update_layout(height=400)
                 st.plotly_chart(fig, use_container_width=True)
+                
+                # 연도별 성능 인사이트
+                year_avg = year_model_pivot.mean(axis=0).sort_values()
+                hardest_year = int(year_avg.index[0])
+                easiest_year = int(year_avg.index[-1])
+                
+                # 연도별 트렌드 분석
+                years_sorted = sorted(year_model_pivot.columns)
+                if len(years_sorted) >= 3:
+                    recent_years = years_sorted[-3:]
+                    old_years = years_sorted[:3]
+                    recent_avg = year_model_pivot[recent_years].mean(axis=1).mean()
+                    old_avg = year_model_pivot[old_years].mean(axis=1).mean()
+                    trend = "상승" if recent_avg > old_avg else "하락" if recent_avg < old_avg else "유지"
+                    trend_en = "improving" if recent_avg > old_avg else "declining" if recent_avg < old_avg else "stable"
+                    
+                    st.success(f"""
+                    💡 **{"연도별 난이도 트렌드" if lang == 'ko' else "Year-over-Year Difficulty Trend"}**:
+                    
+                    📅 **{"연도별 난이도" if lang == 'ko' else "Difficulty by Year"}**:
+                    - **{"가장 어려운 연도" if lang == 'ko' else "Hardest year"}**: {hardest_year} ({"평균" if lang == 'ko' else "avg"}: {year_avg.iloc[0]:.1f}%)
+                    - **{"가장 쉬운 연도" if lang == 'ko' else "Easiest year"}**: {easiest_year} ({"평균" if lang == 'ko' else "avg"}: {year_avg.iloc[-1]:.1f}%)
+                    
+                    📈 **{"시험 난이도 추세" if lang == 'ko' else "Exam Difficulty Trend"}**:
+                    - **{"최근 3년" if lang == 'ko' else "Recent 3 years"}** ({', '.join(map(str, recent_years))}): {"평균" if lang == 'ko' else "avg"} {recent_avg:.1f}%
+                    - **{"초기 3년" if lang == 'ko' else "First 3 years"}** ({', '.join(map(str, old_years))}): {"평균" if lang == 'ko' else "avg"} {old_avg:.1f}%
+                    - **{"추세" if lang == 'ko' else "Trend"}**: {trend if lang == 'ko' else trend_en} ({abs(recent_avg - old_avg):.1f}%p {"차이" if lang == 'ko' else "difference"})
+                    
+                    🎓 **{"학습 가이드" if lang == 'ko' else "Study Guide"}**:
+                    - {"최근 출제 경향에 집중하여 학습" if lang == 'ko' else "Focus on recent exam patterns"}
+                    - {f"{hardest_year}년 문제로 실전 대비" if lang == 'ko' else f"Use {hardest_year} problems for practice"}
+                    """)
+                else:
+                    st.info(f"""
+                    💡 **{"연도별 난이도" if lang == 'ko' else "Difficulty by Year"}**:
+                    - **{"가장 어려운 연도" if lang == 'ko' else "Hardest year"}**: {hardest_year} ({"평균" if lang == 'ko' else "avg"}: {year_avg.iloc[0]:.1f}%)
+                    - **{"가장 쉬운 연도" if lang == 'ko' else "Easiest year"}**: {easiest_year} ({"평균" if lang == 'ko' else "avg"}: {year_avg.iloc[-1]:.1f}%)
+                    """)
             else:
                 st.info("연도 정보가 있는 데이터가 없습니다.")
     
@@ -2529,6 +2702,38 @@ def main():
         fig.update_xaxes(tickangle=45)
         st.plotly_chart(fig, use_container_width=True)
         
+        # 난이도별 성능 인사이트
+        # 모델별 난이도 적응력 분석
+        difficulty_adaptability = {}
+        for model in pivot_difficulty.index:
+            # 매우 어려운 문제 정확도
+            very_hard_acc = pivot_difficulty.loc[model, difficulty_order[0]] if difficulty_order[0] in pivot_difficulty.columns else 0
+            # 매우 쉬운 문제 정확도
+            very_easy_acc = pivot_difficulty.loc[model, difficulty_order[-1]] if difficulty_order[-1] in pivot_difficulty.columns else 0
+            # 격차 (작을수록 일관적)
+            gap = very_easy_acc - very_hard_acc
+            difficulty_adaptability[model] = {'hard': very_hard_acc, 'easy': very_easy_acc, 'gap': gap}
+        
+        best_hard_model = max(difficulty_adaptability.items(), key=lambda x: x[1]['hard'])[0]
+        most_consistent_model = min(difficulty_adaptability.items(), key=lambda x: x[1]['gap'])[0]
+        
+        st.success(f"""
+        💡 **{"난이도별 모델 적응력 분석" if lang == 'ko' else "Model Adaptability by Difficulty"}**:
+        
+        🏆 **{"어려운 문제 대응력" if lang == 'ko' else "Hard Problem Performance"}**:
+        - **{"최고" if lang == 'ko' else "Best"}**: {best_hard_model} ({difficulty_adaptability[best_hard_model]['hard']:.1f}% {"매우 어려운 문제에서" if lang == 'ko' else "on very hard"})
+        - **{"특징" if lang == 'ko' else "Note"}**: {"복잡한 추론이 필요한 경우 활용" if lang == 'ko' else "Use for complex reasoning tasks"}
+        
+        ⚖️ **{"일관성" if lang == 'ko' else "Consistency"}**:
+        - **{"가장 일관적" if lang == 'ko' else "Most Consistent"}**: {most_consistent_model} ({"난이도 격차" if lang == 'ko' else "difficulty gap"}: {difficulty_adaptability[most_consistent_model]['gap']:.1f}%p)
+        - **{"의미" if lang == 'ko' else "Meaning"}**: {"모든 난이도에서 안정적 성능" if lang == 'ko' else "Stable across all difficulties"}
+        
+        📊 **{"활용 전략" if lang == 'ko' else "Usage Strategy"}**:
+        - **{"고난도 시험" if lang == 'ko' else "High-difficulty exams"}**: {best_hard_model} {"권장" if lang == 'ko' else "recommended"}
+        - **{"범용 학습" if lang == 'ko' else "General learning"}**: {most_consistent_model} {"권장" if lang == 'ko' else "recommended"}
+        - **{"라인 차트" if lang == 'ko' else "Line chart"}**: {"난이도가 올라갈수록 성능 하락폭 확인" if lang == 'ko' else "Check performance drop as difficulty increases"}
+        """)
+        
         st.markdown("---")
         
         # 3. 과목별 난이도 분석
@@ -2695,6 +2900,35 @@ def main():
             detailed_difficulty.style.background_gradient(cmap='RdYlGn', axis=None),
             use_container_width=True
         )
+        
+        # 난이도 분석 종합 인사이트
+        # 전체 문제 난이도 분포 분석
+        total_problems = len(difficulty)
+        very_hard_pct = (len(difficulty[difficulty['difficulty_score'] < 20]) / total_problems * 100) if total_problems > 0 else 0
+        hard_pct = (len(difficulty[(difficulty['difficulty_score'] >= 20) & (difficulty['difficulty_score'] < 40)]) / total_problems * 100) if total_problems > 0 else 0
+        medium_pct = (len(difficulty[(difficulty['difficulty_score'] >= 40) & (difficulty['difficulty_score'] < 60)]) / total_problems * 100) if total_problems > 0 else 0
+        easy_pct = (len(difficulty[(difficulty['difficulty_score'] >= 60) & (difficulty['difficulty_score'] < 80)]) / total_problems * 100) if total_problems > 0 else 0
+        very_easy_pct = (len(difficulty[difficulty['difficulty_score'] >= 80]) / total_problems * 100) if total_problems > 0 else 0
+        
+        st.info(f"""
+        💡 **{"난이도 분포 종합 분석" if lang == 'ko' else "Overall Difficulty Distribution"}**:
+        
+        📊 **{"문제 난이도 구성" if lang == 'ko' else "Problem Composition"}**:
+        - **{"매우 어려움" if lang == 'ko' else "Very Hard"}**: {very_hard_pct:.1f}% ({len(difficulty[difficulty['difficulty_score'] < 20])}{"개" if lang == 'ko' else ""})
+        - **{"어려움" if lang == 'ko' else "Hard"}**: {hard_pct:.1f}% ({len(difficulty[(difficulty['difficulty_score'] >= 20) & (difficulty['difficulty_score'] < 40)])}{"개" if lang == 'ko' else ""})
+        - **{"보통" if lang == 'ko' else "Medium"}**: {medium_pct:.1f}% ({len(difficulty[(difficulty['difficulty_score'] >= 40) & (difficulty['difficulty_score'] < 60)])}{"개" if lang == 'ko' else ""})
+        - **{"쉬움" if lang == 'ko' else "Easy"}**: {easy_pct:.1f}% ({len(difficulty[(difficulty['difficulty_score'] >= 60) & (difficulty['difficulty_score'] < 80)])}{"개" if lang == 'ko' else ""})
+        - **{"매우 쉬움" if lang == 'ko' else "Very Easy"}**: {very_easy_pct:.1f}% ({len(difficulty[difficulty['difficulty_score'] >= 80])}{"개" if lang == 'ko' else ""})
+        
+        🎯 **{"변별력 평가" if lang == 'ko' else "Discriminatory Power"}**:
+        - {"중간 난이도(40-60%)" if lang == 'ko' else "Medium difficulty (40-60%)"}: {medium_pct:.1f}% - {"이상적 변별력 구간" if lang == 'ko' else "Ideal discriminatory range"}
+        - {"변별력" if lang == 'ko' else "Overall discriminatory power"}: {"우수" if medium_pct > 30 else "보통" if medium_pct > 20 else "개선 필요" if lang == 'ko' else "Good" if medium_pct > 30 else "Fair" if medium_pct > 20 else "Needs improvement"}
+        
+        📝 **{"학습 전략" if lang == 'ko' else "Study Strategy"}**:
+        - **{"기초 다지기" if lang == 'ko' else "Foundation"}**: {"쉬운 문제로 개념 확립" if lang == 'ko' else "Master basics with easy problems"}
+        - **{"실력 향상" if lang == 'ko' else "Improvement"}**: {"중간 난이도로 실전 대비" if lang == 'ko' else "Practice with medium problems"}
+        - **{"심화 학습" if lang == 'ko' else "Advanced"}**: {"어려운 문제로 고득점 노리기" if lang == 'ko' else "Challenge with hard problems"}
+        """)
     
     # 탭 9: 토큰 및 비용 분석
     with tabs[8]:

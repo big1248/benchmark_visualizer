@@ -1512,7 +1512,7 @@ def main():
                 colorscale='RdYlGn',
                 text=np.round(heatmap_pivot.values, 1),
                 texttemplate='%{text:.1f}',
-                textfont={"size": int(12 * chart_text_size)},
+                textfont={"size": annotation_size},
                 colorbar=dict(title=t['accuracy'] + " (%)"),
                 xgap=2,  # 셀 경계선
                 ygap=2
@@ -1973,7 +1973,7 @@ def main():
                 colorscale='RdYlGn',
                 text=np.round(subject_model_pivot.values, 1),
                 texttemplate='%{text:.1f}',
-                textfont={"size": int(12 * chart_text_size)},
+                textfont={"size": annotation_size},
                 colorbar=dict(title=t['accuracy'] + " (%)"),
                 xgap=2,  # 셀 경계선
                 ygap=2
@@ -2191,7 +2191,7 @@ def main():
                     colorscale='RdYlGn',
                     text=np.round(year_model_pivot.values, 1),
                     texttemplate='%{text:.1f}',
-                    textfont={"size": int(12 * chart_text_size)},
+                    textfont={"size": annotation_size},
                     colorbar=dict(title=t['accuracy'] + " (%)"),
                     xgap=2,  # 셀 경계선
                     ygap=2
@@ -2688,7 +2688,7 @@ def main():
             colorscale='RdYlGn',
             text=np.round(pivot_difficulty.values, 1),
             texttemplate='%{text:.1f}',
-            textfont={"size": int(12 * chart_text_size)},
+            textfont={"size": annotation_size},
             colorbar=dict(title=t['accuracy'] + " (%)"),
             xgap=2,  # 셀 경계선
             ygap=2
@@ -2798,7 +2798,7 @@ def main():
                 colorscale='Blues',
                 text=pivot_subject_diff.values.astype(int),
                 texttemplate='%{text}',
-                textfont={"size": int(12 * chart_text_size)},
+                textfont={"size": annotation_size},
                 colorbar=dict(title=t['problem_count']),
                 xgap=2,  # 셀 경계선
                 ygap=2

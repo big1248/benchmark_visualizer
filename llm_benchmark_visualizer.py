@@ -1012,6 +1012,119 @@ def main():
     else:
         filtered_df = results_df.copy()
     
+    # ========== 앙상블 모델 관리 ==========
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(f"### 🎯 {t['ensemble_management']}")
+    
+    # 세션 상태 초기화
+    if 'ensembles' not in st.session_state:
+        st.session_state.ensembles = []
+    
+    # 앙상블 생성 UI
+    with st.sidebar.expander(f"➕ {t['create_ensemble']}", expanded=False):
+        # 앙상블 이름 입력
+        ensemble_name_input = st.text_input(
+            t['ensemble_name'],
+            value="",
+            placeholder="예: GPT 앙상블" if lang == 'ko' else "e.g., GPT Ensemble",
+            key="ensemble_name_input"
+        )
+        
+        # 모델 선택 (앙상블 제외)
+        available_models_for_ensemble = sorted([m for m in results_df['모델'].unique() if '🎯' not in str(m)])
+        selected_ensemble_models = st.multiselect(
+            t['select_models'],
+            options=available_models_for_ensemble,
+            default=[],
+            help=t['min_2_models'],
+            key="ensemble_models_select"
+        )
+        
+        # 앙상블 방법 선택
+        ensemble_method_options = [t['majority_voting'], t['weighted_voting']]
+        selected_ensemble_method = st.selectbox(
+            t['ensemble_method'],
+            options=ensemble_method_options,
+            key="ensemble_method_select"
+        )
+        
+        # 앙상블 추가 버튼
+        if st.button(f"✅ {t['add_ensemble']}", use_container_width=True, key="add_ensemble_btn"):
+            # 유효성 검사
+            if not ensemble_name_input or ensemble_name_input.strip() == "":
+                st.error("앙상블 이름을 입력하세요" if lang == 'ko' else "Please enter ensemble name")
+            elif len(selected_ensemble_models) < 2:
+                st.error(t['min_2_models'])
+            elif any(e['name'] == ensemble_name_input for e in st.session_state.ensembles):
+                st.error("같은 이름의 앙상블이 이미 있습니다" if lang == 'ko' else "Ensemble with same name exists")
+            else:
+                # 앙상블 방법 매핑
+                method_key = 'majority' if selected_ensemble_method == t['majority_voting'] else 'weighted'
+                
+                # 앙상블 정보 저장
+                st.session_state.ensembles.append({
+                    'name': f"🎯 {ensemble_name_input}",  # 앙상블 식별을 위해 이모지 추가
+                    'models': selected_ensemble_models.copy(),
+                    'method': method_key,
+                    'method_display': selected_ensemble_method
+                })
+                st.success(f"✅ {t['ensemble_added']}: {ensemble_name_input}")
+                st.rerun()
+    
+    # 현재 앙상블 목록 표시
+    if st.session_state.ensembles:
+        st.sidebar.markdown(f"**{t['current_ensembles']}:**")
+        
+        for idx, ensemble in enumerate(st.session_state.ensembles):
+            col1, col2 = st.sidebar.columns([4, 1])
+            
+            with col1:
+                clean_name = ensemble['name'].replace('🎯 ', '')
+                st.sidebar.text(f"{ensemble['name']}")
+                st.sidebar.caption(f"  • {ensemble['method_display']}")
+                st.sidebar.caption(f"  • {len(ensemble['models'])} 모델")
+            
+            with col2:
+                if st.button("🗑️", key=f"del_ensemble_{idx}", help=t['remove_ensemble']):
+                    st.session_state.ensembles.pop(idx)
+                    st.success(t['ensemble_removed'])
+                    st.rerun()
+        
+        # 앙상블 모델 생성 및 원본 데이터에 통합
+        ensemble_dfs = []
+        for ensemble in st.session_state.ensembles:
+            ensemble_df = create_ensemble_model(
+                results_df,
+                ensemble['name'],
+                ensemble['models'],
+                ensemble['method']
+            )
+            if not ensemble_df.empty:
+                ensemble_dfs.append(ensemble_df)
+        
+        # 앙상블 데이터를 원본 데이터에 추가하여 새로운 통합 데이터 생성
+        if ensemble_dfs:
+            # results_df에 앙상블 데이터 추가 (원본은 유지, 통합 데이터는 별도)
+            integrated_df = pd.concat([results_df] + ensemble_dfs, ignore_index=True)
+            
+            # filtered_df를 integrated_df 기반으로 재생성
+            if selected_tests:
+                filtered_df = integrated_df[integrated_df['테스트명'].isin(selected_tests)].copy()
+            else:
+                filtered_df = integrated_df.copy()
+            
+            st.sidebar.success(f"🎯 {len(st.session_state.ensembles)}개 앙상블 활성" if lang == 'ko' else f"🎯 {len(st.session_state.ensembles)} ensemble(s) active")
+        else:
+            # 앙상블 데이터가 없으면 원본 사용
+            if selected_tests:
+                filtered_df = results_df[results_df['테스트명'].isin(selected_tests)].copy()
+            else:
+                filtered_df = results_df.copy()
+    else:
+        st.sidebar.info(t['no_ensembles'])
+    
+    # ========== 앙상블 관리 끝 ==========
+    
     # 모델 필터
     models = sorted(filtered_df['모델'].unique().tolist())
     selected_models = st.sidebar.multiselect(
@@ -1136,178 +1249,6 @@ def main():
             filtered_df = filtered_df[filtered_df['law'] == 'O']
         elif selected_law == t['non_law']:
             filtered_df = filtered_df[filtered_df['law'] != 'O']
-    
-    # ========== 앙상블 모델 관리 ==========
-    st.sidebar.markdown("---")
-    st.sidebar.markdown(f"### 🎯 {t['ensemble_management']}")
-    
-    # 세션 상태 초기화
-    if 'ensembles' not in st.session_state:
-        st.session_state.ensembles = []
-    
-    # 앙상블 생성 UI
-    with st.sidebar.expander(f"➕ {t['create_ensemble']}", expanded=False):
-        # 앙상블 이름 입력
-        ensemble_name = st.text_input(
-            t['ensemble_name'],
-            value="",
-            placeholder="예: GPT 앙상블" if lang == 'ko' else "e.g., GPT Ensemble",
-            key="ensemble_name_input"
-        )
-        
-        # 모델 선택 (원본 데이터에서)
-        available_models = sorted(results_df['모델'].unique().tolist())
-        selected_ensemble_models = st.multiselect(
-            t['select_models'],
-            options=available_models,
-            default=[],
-            help=t['min_2_models'],
-            key="ensemble_models_select"
-        )
-        
-        # 앙상블 방법 선택
-        ensemble_method_options = [t['majority_voting'], t['weighted_voting']]
-        selected_ensemble_method = st.selectbox(
-            t['ensemble_method'],
-            options=ensemble_method_options,
-            key="ensemble_method_select"
-        )
-        
-        # 앙상블 추가 버튼
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            if st.button(f"✅ {t['add_ensemble']}", use_container_width=True, key="add_ensemble_btn"):
-                # 유효성 검사
-                if not ensemble_name or ensemble_name.strip() == "":
-                    st.error(t['min_2_models'] if 'ensemble_name_required' not in t else t.get('ensemble_name_required', '앙상블 이름을 입력하세요'))
-                elif len(selected_ensemble_models) < 2:
-                    st.error(t['min_2_models'])
-                elif any(e['name'] == ensemble_name for e in st.session_state.ensembles):
-                    st.error(t.get('ensemble_exists', '같은 이름의 앙상블이 이미 있습니다'))
-                else:
-                    # 앙상블 방법 매핑
-                    method_key = 'majority' if selected_ensemble_method == t['majority_voting'] else 'weighted'
-                    
-                    # 앙상블 정보 저장
-                    st.session_state.ensembles.append({
-                        'name': ensemble_name,
-                        'models': selected_ensemble_models.copy(),
-                        'method': method_key,
-                        'method_display': selected_ensemble_method
-                    })
-                    st.success(f"✅ {t['ensemble_added']}: {ensemble_name}")
-                    st.rerun()
-    
-    # 현재 앙상블 목록 표시
-    if st.session_state.ensembles:
-        st.sidebar.markdown(f"**{t['current_ensembles']}:**")
-        
-        for idx, ensemble in enumerate(st.session_state.ensembles):
-            col1, col2 = st.sidebar.columns([4, 1])
-            
-            with col1:
-                st.markdown(f"""
-                **🎯 {ensemble['name']}**  
-                - {t['ensemble_method']}: {ensemble['method_display']}  
-                - {t['model']} ({len(ensemble['models'])}개): {', '.join(ensemble['models'][:2])}{'...' if len(ensemble['models']) > 2 else ''}
-                """)
-            
-            with col2:
-                if st.button("🗑️", key=f"del_ensemble_{idx}", help=t['remove_ensemble']):
-                    st.session_state.ensembles.pop(idx)
-                    st.success(t['ensemble_removed'])
-                    st.rerun()
-        
-        # 앙상블 모델 생성 및 데이터 통합
-        ensemble_dfs = []
-        for ensemble in st.session_state.ensembles:
-            ensemble_df = create_ensemble_model(
-                results_df,
-                ensemble['name'],
-                ensemble['models'],
-                ensemble['method']
-            )
-            if not ensemble_df.empty:
-                ensemble_dfs.append(ensemble_df)
-        
-        # 앙상블 데이터를 원본 데이터에 추가
-        if ensemble_dfs:
-            combined_df = pd.concat([results_df] + ensemble_dfs, ignore_index=True)
-            
-            # filtered_df도 업데이트 (기존 필터 다시 적용)
-            # 테스트명 필터
-            if selected_tests:
-                combined_df_filtered = combined_df[combined_df['테스트명'].isin(selected_tests)].copy()
-            else:
-                combined_df_filtered = combined_df.copy()
-            
-            # 모델 필터 (앙상블 포함)
-            all_models = sorted(combined_df_filtered['모델'].unique().tolist())
-            
-            # 기존 선택 모델 + 앙상블 모델도 기본 선택
-            ensemble_names = [e['name'] for e in st.session_state.ensembles]
-            default_models = list(set(selected_models + ensemble_names))
-            
-            # 모델 필터 업데이트 (앙상블 포함)
-            if selected_models:
-                combined_df_filtered = combined_df_filtered[combined_df_filtered['모델'].isin(selected_models + ensemble_names)]
-            
-            # 상세도 필터 (앙상블은 'ensemble'로 분류됨)
-            if selected_details:
-                combined_df_filtered = combined_df_filtered[
-                    (combined_df_filtered['상세도'].isin(selected_details)) |
-                    (combined_df_filtered['상세도'] == 'ensemble')
-                ]
-            
-            # 프롬프팅 필터 (앙상블은 방법(majority/weighted)으로 분류됨)
-            if selected_prompts:
-                combined_df_filtered = combined_df_filtered[
-                    (combined_df_filtered['프롬프팅'].isin(selected_prompts)) |
-                    (combined_df_filtered['프롬프팅'].isin(['majority', 'weighted']))
-                ]
-            
-            # 나머지 필터들도 적용 (세션, 문제유형, 연도, 법령)
-            if selected_tests and available_sessions:
-                if selected_sessions:
-                    def match_session(x):
-                        if pd.isna(x):
-                            return False
-                        x_int = safe_convert_to_int(x)
-                        if x_int is not None and x_int in selected_sessions:
-                            return True
-                        if isinstance(x, str):
-                            x_clean = x.strip()
-                            return x_clean in selected_sessions
-                        return False
-                    
-                    combined_df_filtered = combined_df_filtered[combined_df_filtered['Session'].apply(match_session)]
-            
-            if 'image' in combined_df_filtered.columns:
-                if selected_problem_type == t['image_problem']:
-                    combined_df_filtered = combined_df_filtered[combined_df_filtered['image'] != 'text_only']
-                elif selected_problem_type == t['text_only']:
-                    combined_df_filtered = combined_df_filtered[combined_df_filtered['image'] == 'text_only']
-            
-            if 'Year' in combined_df_filtered.columns and years:
-                if selected_years:
-                    combined_df_filtered = combined_df_filtered[combined_df_filtered['Year'].apply(
-                        lambda x: safe_convert_to_int(x) in selected_years if pd.notna(x) else False
-                    )]
-            
-            if 'law' in combined_df_filtered.columns:
-                if selected_law == t['law']:
-                    combined_df_filtered = combined_df_filtered[combined_df_filtered['law'] == 'O']
-                elif selected_law == t['non_law']:
-                    combined_df_filtered = combined_df_filtered[combined_df_filtered['law'] != 'O']
-            
-            # filtered_df를 앙상블이 포함된 데이터로 교체
-            filtered_df = combined_df_filtered
-            
-            st.sidebar.success(f"🎯 {len(st.session_state.ensembles)}개 앙상블 활성화됨" if lang == 'ko' else f"🎯 {len(st.session_state.ensembles)} ensemble(s) active")
-    else:
-        st.sidebar.info(t['no_ensembles'])
-    
-    # ========== 앙상블 관리 끝 ==========
     
     # 필터링된 데이터가 없는 경우
     if filtered_df.empty:

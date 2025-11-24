@@ -1194,7 +1194,7 @@ def main():
             )
             fig.update_traces(
                 texttemplate='%{text:.1f}%',
-                textposition='outside',
+                textposition='outside',                textfont=dict(size=annotation_size),
                 marker_line_color='black',
                 marker_line_width=1.5
             )
@@ -1223,7 +1223,7 @@ def main():
                     y=law_comparison['정답률'],
                     text=law_comparison['정답률'].round(1),
                     texttemplate='%{text}%',
-                    textposition='outside',
+                    textposition='outside',                textfont=dict(size=annotation_size),
                     marker_color=['#FF6B6B', '#4ECDC4'],
                     marker_line_color='black',
                     marker_line_width=1.5,
@@ -1236,7 +1236,7 @@ def main():
                     y=law_comparison['문제수'],
                     text=law_comparison['문제수'],
                     texttemplate='%{text}개',
-                    textposition='top center',
+                    textposition='top center',                textfont=dict(size=annotation_size),
                     mode='lines+markers+text',
                     marker=dict(size=10, color='orange'),
                     line=dict(width=2, color='orange'),
@@ -1353,7 +1353,7 @@ def main():
                 )
                 fig.update_traces(
                 texttemplate='%{text:.1f}%',
-                textposition='outside',
+                textposition='outside',                textfont=dict(size=annotation_size),
                 marker_line_color='black',
                 marker_line_width=1.5
             )
@@ -1454,7 +1454,7 @@ def main():
             )
             fig.update_traces(
                 texttemplate='%{text:.1f}%',
-                textposition='outside',
+                textposition='outside',                textfont=dict(size=annotation_size),
                 marker_line_color='black',
                 marker_line_width=1.5
             )
@@ -1640,7 +1640,7 @@ def main():
                     )
                     fig.update_traces(
                         texttemplate='%{text:.2f}s',
-                        textposition='outside',
+                        textposition='outside',                textfont=dict(size=annotation_size),
                         marker_line_color='black',
                         marker_line_width=1.5
                     )
@@ -1948,7 +1948,7 @@ def main():
                 )
                 fig.update_traces(
                     texttemplate='%{text:.1f}%',
-                    textposition='outside',
+                    textposition='outside',                textfont=dict(size=annotation_size),
                     marker_line_color='black',
                     marker_line_width=1.5
                 )
@@ -2085,7 +2085,7 @@ def main():
                     )
                     fig.update_traces(
                         texttemplate='%{text:.1f}%',
-                        textposition='top center',
+                        textposition='top center',                textfont=dict(size=annotation_size),
                         marker_size=10,
                         marker_line_color='black',
                         marker_line_width=2,
@@ -2163,7 +2163,7 @@ def main():
                     )
                     fig.update_traces(
                 texttemplate='%{text}',
-                textposition='outside',
+                textposition='outside',                textfont=dict(size=annotation_size),
                 marker_line_color='black',
                 marker_line_width=1.5
             )
@@ -2585,7 +2585,7 @@ def main():
             )
             fig.update_traces(
                 texttemplate='%{text}',
-                textposition='outside',
+                textposition='outside',                textfont=dict(size=annotation_size),
                 marker_line_color='black',
                 marker_line_width=1.5
             )
@@ -2769,7 +2769,7 @@ def main():
             )
             fig.update_traces(
                 texttemplate='%{text:.1f}%',
-                textposition='outside',
+                textposition='outside',                textfont=dict(size=annotation_size),
                 marker_line_color='black',
                 marker_line_width=1.5
             )
@@ -3127,7 +3127,7 @@ def main():
                         )
                         fig.update_traces(
                             texttemplate='%{text:,.0f}',
-                            textposition='outside',
+                            textposition='outside',                textfont=dict(size=annotation_size),
                             marker_line_color='black',
                             marker_line_width=1.5
                         )
@@ -3192,7 +3192,7 @@ def main():
                         )
                         fig.update_traces(
                             texttemplate='%{text:,.0f}',
-                            textposition='outside',
+                            textposition='outside',                textfont=dict(size=annotation_size),
                             marker_line_color='black',
                             marker_line_width=1.5
                         )
@@ -3441,7 +3441,7 @@ def main():
                                 )
                                 fig.update_traces(
                                     texttemplate='$%{text:.6f}',
-                                    textposition='outside',
+                                    textposition='outside',                textfont=dict(size=annotation_size),
                                     marker_line_color='black',
                                     marker_line_width=1.5
                                 )
@@ -3467,7 +3467,7 @@ def main():
                                 )
                                 fig.update_traces(
                                     texttemplate='$%{text:.8f}',
-                                    textposition='outside',
+                                    textposition='outside',                textfont=dict(size=annotation_size),
                                     marker_line_color='black',
                                     marker_line_width=1.5
                                 )
@@ -3540,7 +3540,7 @@ def main():
                         )
                         fig.update_traces(
                             textposition='inside',
-                            textinfo='percent+label',
+                            textinfo='percent+label',                textfont=dict(size=annotation_size),
                             marker=dict(line=dict(color='black', width=2))
                         )
                         fig.update_layout(height=400)
@@ -3569,7 +3569,7 @@ def main():
                         )
                         fig.update_traces(
                             texttemplate='%{text:.1f}%',
-                            textposition='outside',
+                            textposition='outside',                textfont=dict(size=annotation_size),
                             marker_line_color='black',
                             marker_line_width=1.5
                         )

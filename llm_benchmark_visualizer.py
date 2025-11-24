@@ -1332,7 +1332,7 @@ def main():
                     yaxis_title='문제 수' if lang == 'ko' else 'Problem Count',
                     xaxis_title='테스트명' if lang == 'ko' else 'Test Name'
                 )
-                fig.update_xaxes(tickangle=45)
+                fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
                 st.plotly_chart(fig, use_container_width=True)
             
             with col2:
@@ -1364,7 +1364,7 @@ def main():
                     xaxis_title='테스트명',
                     yaxis=dict(range=[0, 100])
                 )
-                fig.update_xaxes(tickangle=45)
+                fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
                 st.plotly_chart(fig, use_container_width=True)
         
         # 종합 인사이트
@@ -1519,7 +1519,8 @@ def main():
             ))
             
             fig.update_layout(height=400)
-            fig.update_xaxes(tickangle=45)
+            fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
+            fig.update_yaxes(tickfont=dict(size=annotation_size))
             st.plotly_chart(fig, use_container_width=True)
             
             # 히트맵 인사이트
@@ -1667,7 +1668,7 @@ def main():
                         yaxis_title=t['response_time'] + ' (' + t['seconds'] + ')',
                         xaxis_title=t['model']
                     )
-                    fig.update_xaxes(tickangle=45)
+                    fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
                     st.plotly_chart(fig, use_container_width=True)
                 
                 st.markdown("---")
@@ -1741,7 +1742,7 @@ def main():
                         xaxis_title=t['testname'],
                         yaxis_title=t['response_time'] + ' (' + t['seconds'] + ')'
                     )
-                    fig.update_xaxes(tickangle=45)
+                    fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
                     st.plotly_chart(fig, use_container_width=True)
                     
                     # 테스트별 인사이트
@@ -1958,7 +1959,7 @@ def main():
                     yaxis_title=t['accuracy'] + ' (%)',
                     xaxis_title=t['by_subject'].replace('별', '')
                 )
-                fig.update_xaxes(tickangle=45)
+                fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
                 st.plotly_chart(fig, use_container_width=True)
             
             # 모델별 과목 성능 히트맵 (셀 경계선 추가)
@@ -1979,7 +1980,8 @@ def main():
                 ygap=2
             ))
             fig.update_layout(height=400)
-            fig.update_xaxes(tickangle=45)
+            fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
+            fig.update_yaxes(tickfont=dict(size=annotation_size))
             st.plotly_chart(fig, use_container_width=True)
             
             # 과목별 성능 인사이트
@@ -2197,6 +2199,8 @@ def main():
                     ygap=2
                 ))
                 fig.update_layout(height=400)
+                fig.update_xaxes(tickfont=dict(size=annotation_size))
+                fig.update_yaxes(tickfont=dict(size=annotation_size))
                 st.plotly_chart(fig, use_container_width=True)
                 
                 # 연도별 성능 인사이트
@@ -2481,7 +2485,7 @@ def main():
             xaxis_title=t['problem_id'],
             yaxis=dict(range=[0, 1])  # y축 범위를 0~1로 고정
         )
-        fig.update_xaxes(tickangle=45)
+        fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
         st.plotly_chart(fig, use_container_width=True)
     
     # 탭 8: 난이도 분석
@@ -2593,7 +2597,7 @@ def main():
                 height=400,
                 showlegend=False
             )
-            fig.update_xaxes(tickangle=45)
+            fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
             st.plotly_chart(fig, use_container_width=True)
         
         # 통계 요약
@@ -2668,7 +2672,7 @@ def main():
             line_width=3
         )
         fig.update_layout(height=500)
-        fig.update_xaxes(tickangle=45)
+        fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
         st.plotly_chart(fig, use_container_width=True)
         
         # 히트맵
@@ -2699,7 +2703,8 @@ def main():
             xaxis_title=t['difficulty_range'],
             yaxis_title=t['model']
         )
-        fig.update_xaxes(tickangle=45)
+        fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
+        fig.update_yaxes(tickfont=dict(size=annotation_size))
         st.plotly_chart(fig, use_container_width=True)
         
         # 난이도별 성능 인사이트
@@ -2773,7 +2778,7 @@ def main():
                 marker_line_color='black',
                 marker_line_width=1.5
             )
-            fig.update_xaxes(tickangle=45)
+            fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
             fig.update_layout(
                 height=500,
                 showlegend=False
@@ -2809,7 +2814,8 @@ def main():
                 xaxis_title=t['difficulty_range'],
                 yaxis_title=t['by_subject'].replace('별', '')  # '과목' or 'Subject'
             )
-            fig.update_xaxes(tickangle=45)
+            fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
+            fig.update_yaxes(tickfont=dict(size=annotation_size))
             st.plotly_chart(fig, use_container_width=True)
         
         st.markdown("---")
@@ -3137,7 +3143,7 @@ def main():
                             yaxis_title=t['total_tokens'],
                             xaxis_title=t['model']
                         )
-                        fig.update_xaxes(tickangle=45)
+                        fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
                         st.plotly_chart(fig, use_container_width=True)
                 
                 with col2:
@@ -3168,7 +3174,7 @@ def main():
                             yaxis_title=t['tokens'],
                             xaxis_title=t['model']
                         )
-                        fig.update_xaxes(tickangle=45)
+                        fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
                         st.plotly_chart(fig, use_container_width=True)
                 
                 st.markdown("---")
@@ -3202,7 +3208,7 @@ def main():
                             yaxis_title=t['tokens'] + ' / ' + t['correct'],
                             xaxis_title=t['model']
                         )
-                        fig.update_xaxes(tickangle=45)
+                        fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
                         st.plotly_chart(fig, use_container_width=True)
                     
                     with col2:
@@ -3451,7 +3457,7 @@ def main():
                                     yaxis_title=t['cost'] + ' (USD)',
                                     xaxis_title=t['model']
                                 )
-                                fig.update_xaxes(tickangle=45)
+                                fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
                                 st.plotly_chart(fig, use_container_width=True)
                             
                             with col2:
@@ -3477,7 +3483,7 @@ def main():
                                     yaxis_title=t['cost'] + ' (USD)',
                                     xaxis_title=t['model']
                                 )
-                                fig.update_xaxes(tickangle=45)
+                                fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
                                 st.plotly_chart(fig, use_container_width=True)
                             
                             st.markdown("---")
@@ -3662,7 +3668,7 @@ def main():
                         xaxis_title=t['testname'],
                         yaxis_title=t['total_tokens']
                     )
-                    fig.update_xaxes(tickangle=45)
+                    fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
                     st.plotly_chart(fig, use_container_width=True)
                 
                 st.markdown("---")
@@ -3701,7 +3707,7 @@ def main():
                             height=400,
                             xaxis_title=t['model']
                         )
-                        fig.update_xaxes(tickangle=45)
+                        fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
                         st.plotly_chart(fig, use_container_width=True)
                     
                     with col2:
@@ -3720,7 +3726,7 @@ def main():
                             xaxis_title=t['model'],
                             yaxis=dict(range=[0, 100])
                         )
-                        fig.update_xaxes(tickangle=45)
+                        fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
                         st.plotly_chart(fig, use_container_width=True)
     
     # 탭 10: 테스트셋 통계
@@ -3805,7 +3811,7 @@ def main():
                                                          columns=['Subject', 'Count'])
                                 fig = px.bar(subject_df, x='Subject', y='Count', 
                                            title=t['subject_distribution'])
-                                fig.update_xaxes(tickangle=45)
+                                fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
                                 st.plotly_chart(fig, use_container_width=True)
                         
                         with col2:

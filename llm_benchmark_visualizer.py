@@ -2468,7 +2468,7 @@ def main():
         st.header(f"🔬 {'심층 오답 분석' if lang == 'ko' else 'Deep Incorrect Analysis'}")
         
         st.markdown("""
-        > **논문 기반 심층 분석**: 이 탭은 학술 논문의 "공통 오답(Common Mistakes)" 분석 방법론을 적용합니다.
+        > **논문 기반 심층 분석**: 이 탭은 DisasterQA논문의 "지식 격차/Knowledge Gap(Common Mistakes)" 분석 방법론을 적용합니다.
         > 단순히 오답률이 높은 문제를 넘어, **모델들이 일관되게 같은 오답을 선택하는 패턴**을 식별하여 
         > LLM의 근본적인 지식 문제를 파악합니다.
         """)
@@ -2586,6 +2586,53 @@ def main():
         st.markdown("---")
         st.subheader("🎯 " + ("일관된 오답 선택 패턴 (공통 오답 핵심 지표)" if lang == 'ko' else "Consistent Incorrect Answer Pattern"))
         
+        with st.expander("📖 " + ("공통 오답이란? (계산 방식 설명)" if lang == 'ko' else "What is Common Wrong Answer?")):
+            st.markdown("""
+            ### 🔍 계산 방식
+            
+            **1단계: 오답 수집**
+            ```
+            문제 Q1에서:
+            - GPT-4o: 3번 선택 (정답: 2번) ❌
+            - Claude: 3번 선택 (정답: 2번) ❌
+            - Gemini: 4번 선택 (정답: 2번) ❌
+            - EXAONE: 3번 선택 (정답: 2번) ❌
+            
+            → 오답 목록: [3, 3, 4, 3]
+            ```
+            
+            **2단계: 가장 많이 선택된 오답 찾기**
+            ```
+            오답 통계:
+            - 3번: 3회 ⭐ (가장 많음)
+            - 4번: 1회
+            
+            → 공통 오답: 3번
+            ```
+            
+            **3단계: 일관성 계산**
+            ```
+            일관성 = (가장 많은 오답 횟수) / (전체 오답 횟수)
+                  = 3회 / 4회
+                  = 75%
+            
+            → 75% 일관성 (4개 중 3개가 같은 답 선택)
+            ```
+            
+            **4단계: 일관성 50% 이상만 표시**
+            ```
+            ✅ 75% 일관성 → 표시 (의미 있는 패턴)
+            ✅ 100% 일관성 → 표시 (완벽한 패턴)
+            ❌ 40% 일관성 → 제외 (우연일 가능성)
+            ```
+            
+            ### 💡 왜 중요한가?
+            - **무작위 오답**: 각 모델이 다른 답 선택 → 우연
+            - **일관된 오답**: 여러 모델이 같은 답 선택 → 체계적 오해!
+            
+            일관된 오답은 특정 개념에 대한 근본적인 오해를 의미합니다.
+            """)
+        
         st.info("""
         💡 **핵심 인사이트**: 모델들이 단순히 틀리는 것이 아니라, **같은 오답을 일관되게 선택**하는 경우 
         이는 해당 지식 영역에 대한 근본적인 이해 부족을 의미합니다. (논문 방법론 적용)
@@ -2599,11 +2646,12 @@ def main():
                 selected = row['selected_answers']
                 correct = row['CorrectAnswer']
                 
-                # 오답을 선택한 모델들의 답변 수집
+                # 오답을 선택한 모델들의 답변 수집 (문자열로 변환하되, nan 제외)
                 wrong_answers = []
                 for model, answer in selected.items():
-                    if str(answer) != str(correct):
-                        wrong_answers.append(str(answer))
+                    if pd.notna(answer) and str(answer).strip() != '' and str(answer) != str(correct):
+                        # 정답이 아니면 오답
+                        wrong_answers.append(str(answer).strip())
                 
                 if wrong_answers:
                     from collections import Counter
@@ -2614,15 +2662,15 @@ def main():
                     
                     if consistency_ratio >= 0.5:
                         models_selected_this = [m for m, a in selected.items() 
-                                              if str(a) == most_common_wrong]
+                                              if pd.notna(a) and str(a).strip() == most_common_wrong]
                         
                         consistent_wrong_patterns.append({
                             'problem_id': row['problem_id'],
                             'Question': row['Question'],
                             'Subject': row['Subject'],
                             'Year': row['Year'],
-                            'correct_answer': correct,
-                            'common_wrong_answer': most_common_wrong,
+                            'correct_answer': str(correct).strip(),  # 문자열로 명시적 변환
+                            'common_wrong_answer': most_common_wrong,  # 이미 문자열
                             'wrong_answer_count': count,
                             'total_wrong': len(wrong_answers),
                             'consistency_ratio': consistency_ratio,
@@ -2633,6 +2681,20 @@ def main():
         if consistent_wrong_patterns:
             consistent_df = pd.DataFrame(consistent_wrong_patterns)
             consistent_df = consistent_df.sort_values('consistency_ratio', ascending=False)
+            
+            # 100% 일관성과 50% 이상 일관성 구분
+            perfect_consistency = consistent_df[consistent_df['consistency_ratio'] == 1.0]
+            high_consistency = consistent_df[consistent_df['consistency_ratio'] >= 0.5]
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("총 일관된 오답 패턴", f"{len(consistent_df)}개")
+            with col2:
+                st.metric("100% 일관성", f"{len(perfect_consistency)}개", 
+                         delta=f"{len(perfect_consistency)/len(consistent_df)*100:.1f}%")
+            with col3:
+                st.metric("50% 이상 일관성", f"{len(high_consistency)}개",
+                         delta=f"{len(high_consistency)/len(consistent_df)*100:.1f}%")
             
             st.success(f"""
             ✅ **{len(consistent_df)}개의 일관된 오답 패턴 발견!**
@@ -2676,58 +2738,123 @@ def main():
                     fig.update_xaxes(tickangle=45)
                     st.plotly_chart(fig, use_container_width=True)
             
-            st.markdown("#### " + ("🔴 가장 일관된 오답 선택 패턴 Top 20" if lang == 'ko' else "🔴 Top 20 Most Consistent Wrong Answer Patterns"))
+            # 탭으로 100% / 50% 이상 구분
+            tab1, tab2 = st.tabs([
+                f"🔴 100% 일관성 ({len(perfect_consistency)}개)",
+                f"🟠 50% 이상 일관성 ({len(high_consistency)}개)"
+            ])
             
-            display_consistent = consistent_df.head(20).copy()
-            display_consistent['일관성_pct'] = (display_consistent['consistency_ratio'] * 100).round(1)
-            display_consistent['오답_정보'] = (display_consistent['common_wrong_answer'].astype(str) + 
-                                           ' (' + display_consistent['wrong_answer_count'].astype(str) + 
-                                           '/' + display_consistent['total_wrong'].astype(str) + ')')
+            with tab1:
+                st.markdown("#### " + ("모든 오답 모델이 같은 답을 선택한 문제" if lang == 'ko' else "All Wrong Models Selected Same Answer"))
+                
+                if len(perfect_consistency) > 0:
+                    display_perfect = perfect_consistency.copy()
+                    display_perfect['일관성_pct'] = (display_perfect['consistency_ratio'] * 100).round(1)
+                    display_perfect['오답_정보'] = (display_perfect['common_wrong_answer'].astype(str) + 
+                                                   ' (' + display_perfect['wrong_answer_count'].astype(str) + 
+                                                   '/' + display_perfect['total_wrong'].astype(str) + ')')
+                    
+                    display_df = pd.DataFrame({
+                        '문제 번호' if lang == 'ko' else 'Problem ID': display_perfect['problem_id'],
+                        '과목' if lang == 'ko' else 'Subject': display_perfect['Subject'],
+                        '정답' if lang == 'ko' else 'Correct': display_perfect['correct_answer'],
+                        '공통 오답 (횟수/전체)': display_perfect['오답_정보'],
+                        '일관성 (%)': display_perfect['일관성_pct'],
+                        '해당 오답 선택 모델': display_perfect['models_with_this_wrong']
+                    })
+                    
+                    st.dataframe(
+                        display_df.style.background_gradient(
+                            subset=['일관성 (%)'],
+                            cmap='Reds',
+                            vmin=50,
+                            vmax=100
+                        ).format({'일관성 (%)': '{:.1f}%'}),
+                        use_container_width=True,
+                        height=500
+                    )
+                    
+                    if st.checkbox('📋 ' + ('100% 일관성 문제 상세 보기' if lang == 'ko' else 'Show Details'), key='perfect_details'):
+                        for idx, row in display_perfect.head(20).iterrows():
+                            with st.expander(f"🔍 {row['problem_id']} - 일관성 100%"):
+                                q_detail = filtered_df[filtered_df['Question'] == row['Question']].iloc[0]
+                                
+                                st.markdown(f"**{'문제' if lang == 'ko' else 'Question'}:** {q_detail['Question']}")
+                                st.markdown(f"**{'과목' if lang == 'ko' else 'Subject'}:** {row['Subject']}")
+                                
+                                if all([f'Option {i}' in q_detail for i in range(1, 5)]):
+                                    st.markdown("**선택지:**")
+                                    for i in range(1, 5):
+                                        option = q_detail[f'Option {i}']
+                                        if pd.notna(option):
+                                            if str(i) == str(row['correct_answer']):
+                                                st.markdown(f"✅ **{i}. {option}** (정답)")
+                                            elif str(i) == str(row['common_wrong_answer']):
+                                                st.markdown(f"❌ **{i}. {option}** (모든 오답 모델이 선택)")
+                                            else:
+                                                st.markdown(f"  {i}. {option}")
+                                
+                                st.markdown(f"**🎯 정답:** {row['correct_answer']}")
+                                st.markdown(f"**❌ 공통 오답:** {row['common_wrong_answer']} (모든 {row['total_wrong']}개 오답 모델)")
+                                st.markdown(f"**🤖 해당 오답 선택 모델:** {row['models_with_this_wrong']}")
+                else:
+                    st.info("100% 일관성 패턴이 발견되지 않았습니다.")
             
-            # 표시용 데이터프레임
-            display_df = pd.DataFrame({
-                '문제 번호' if lang == 'ko' else 'Problem ID': display_consistent['problem_id'],
-                '과목' if lang == 'ko' else 'Subject': display_consistent['Subject'],
-                '정답' if lang == 'ko' else 'Correct': display_consistent['correct_answer'],
-                '공통 오답 (횟수/전체)': display_consistent['오답_정보'],
-                '일관성 (%)': display_consistent['일관성_pct'],
-                '해당 오답 선택 모델': display_consistent['models_with_this_wrong']
-            })
-            
-            st.dataframe(
-                display_df.style.background_gradient(
-                    subset=['일관성 (%)'],
-                    cmap='Reds',
-                    vmin=50,
-                    vmax=100
-                ).format({'일관성 (%)': '{:.1f}%'}),
-                use_container_width=True,
-                height=500
-            )
-            
-            if st.checkbox('📋 ' + ('일관된 오답 문제 상세 내용 보기' if lang == 'ko' else 'Show Detailed Content'), key='consistent_details'):
-                for idx, row in display_consistent.head(10).iterrows():
-                    with st.expander(f"🔍 {row['problem_id']} - 일관성 {row['consistency_ratio']*100:.1f}%"):
-                        q_detail = filtered_df[filtered_df['Question'] == row['Question']].iloc[0]
-                        
-                        st.markdown(f"**{'문제' if lang == 'ko' else 'Question'}:** {q_detail['Question']}")
-                        st.markdown(f"**{'과목' if lang == 'ko' else 'Subject'}:** {row['Subject']}")
-                        
-                        if all([f'Option {i}' in q_detail for i in range(1, 5)]):
-                            st.markdown("**선택지:**")
-                            for i in range(1, 5):
-                                option = q_detail[f'Option {i}']
-                                if pd.notna(option):
-                                    if str(i) == str(row['correct_answer']):
-                                        st.markdown(f"✅ **{i}. {option}** (정답)")
-                                    elif str(i) == str(row['common_wrong_answer']):
-                                        st.markdown(f"❌ **{i}. {option}** (일관된 오답 - {row['wrong_answer_count']}개 모델)")
-                                    else:
-                                        st.markdown(f"  {i}. {option}")
-                        
-                        st.markdown(f"**🎯 정답:** {row['correct_answer']}")
-                        st.markdown(f"**❌ 공통 오답:** {row['common_wrong_answer']} ({row['wrong_answer_count']}/{row['total_wrong']} = {row['consistency_ratio']*100:.1f}% 일관성)")
-                        st.markdown(f"**🤖 해당 오답 선택 모델:** {row['models_with_this_wrong']}")
+            with tab2:
+                st.markdown("#### " + ("50% 이상의 오답 모델이 같은 답을 선택한 문제" if lang == 'ko' else "≥50% Wrong Models Selected Same Answer"))
+                
+                if len(high_consistency) > 0:
+                    display_high = high_consistency.copy()
+                    display_high['일관성_pct'] = (display_high['consistency_ratio'] * 100).round(1)
+                    display_high['오답_정보'] = (display_high['common_wrong_answer'].astype(str) + 
+                                               ' (' + display_high['wrong_answer_count'].astype(str) + 
+                                               '/' + display_high['total_wrong'].astype(str) + ')')
+                    
+                    display_df = pd.DataFrame({
+                        '문제 번호' if lang == 'ko' else 'Problem ID': display_high['problem_id'],
+                        '과목' if lang == 'ko' else 'Subject': display_high['Subject'],
+                        '정답' if lang == 'ko' else 'Correct': display_high['correct_answer'],
+                        '공통 오답 (횟수/전체)': display_high['오답_정보'],
+                        '일관성 (%)': display_high['일관성_pct'],
+                        '해당 오답 선택 모델': display_high['models_with_this_wrong']
+                    })
+                    
+                    st.dataframe(
+                        display_df.style.background_gradient(
+                            subset=['일관성 (%)'],
+                            cmap='Reds',
+                            vmin=50,
+                            vmax=100
+                        ).format({'일관성 (%)': '{:.1f}%'}),
+                        use_container_width=True,
+                        height=500
+                    )
+                    
+                    if st.checkbox('📋 ' + ('50% 이상 일관성 문제 상세 보기' if lang == 'ko' else 'Show Details'), key='high_details'):
+                        for idx, row in display_high.head(30).iterrows():
+                            with st.expander(f"🔍 {row['problem_id']} - 일관성 {row['consistency_ratio']*100:.1f}%"):
+                                q_detail = filtered_df[filtered_df['Question'] == row['Question']].iloc[0]
+                                
+                                st.markdown(f"**{'문제' if lang == 'ko' else 'Question'}:** {q_detail['Question']}")
+                                st.markdown(f"**{'과목' if lang == 'ko' else 'Subject'}:** {row['Subject']}")
+                                
+                                if all([f'Option {i}' in q_detail for i in range(1, 5)]):
+                                    st.markdown("**선택지:**")
+                                    for i in range(1, 5):
+                                        option = q_detail[f'Option {i}']
+                                        if pd.notna(option):
+                                            if str(i) == str(row['correct_answer']):
+                                                st.markdown(f"✅ **{i}. {option}** (정답)")
+                                            elif str(i) == str(row['common_wrong_answer']):
+                                                st.markdown(f"❌ **{i}. {option}** (일관된 오답 - {row['wrong_answer_count']}개 모델)")
+                                            else:
+                                                st.markdown(f"  {i}. {option}")
+                                
+                                st.markdown(f"**🎯 정답:** {row['correct_answer']}")
+                                st.markdown(f"**❌ 공통 오답:** {row['common_wrong_answer']} ({row['wrong_answer_count']}/{row['total_wrong']} = {row['consistency_ratio']*100:.1f}% 일관성)")
+                                st.markdown(f"**🤖 해당 오답 선택 모델:** {row['models_with_this_wrong']}")
+                else:
+                    st.info("50% 이상 일관성 패턴이 발견되지 않았습니다.")
         else:
             st.warning("일관된 오답 선택 패턴이 발견되지 않았습니다.")
         

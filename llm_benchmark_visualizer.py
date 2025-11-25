@@ -2679,25 +2679,28 @@ def main():
             st.markdown("#### " + ("🔴 가장 일관된 오답 선택 패턴 Top 20" if lang == 'ko' else "🔴 Top 20 Most Consistent Wrong Answer Patterns"))
             
             display_consistent = consistent_df.head(20).copy()
-            display_consistent['일관성'] = (display_consistent['consistency_ratio'] * 100).round(1).astype(str) + '%'
+            display_consistent['일관성_pct'] = (display_consistent['consistency_ratio'] * 100).round(1)
             display_consistent['오답_정보'] = (display_consistent['common_wrong_answer'].astype(str) + 
                                            ' (' + display_consistent['wrong_answer_count'].astype(str) + 
                                            '/' + display_consistent['total_wrong'].astype(str) + ')')
             
-            display_cols = {
-                'problem_id': '문제 번호' if lang == 'ko' else 'Problem ID',
-                'Subject': '과목' if lang == 'ko' else 'Subject',
-                'correct_answer': '정답' if lang == 'ko' else 'Correct',
-                '오답_정보': '공통 오답 (횟수/전체)',
-                '일관성': '일관성',
-                'models_with_this_wrong': '해당 오답 선택 모델'
-            }
+            # 표시용 데이터프레임
+            display_df = pd.DataFrame({
+                '문제 번호' if lang == 'ko' else 'Problem ID': display_consistent['problem_id'],
+                '과목' if lang == 'ko' else 'Subject': display_consistent['Subject'],
+                '정답' if lang == 'ko' else 'Correct': display_consistent['correct_answer'],
+                '공통 오답 (횟수/전체)': display_consistent['오답_정보'],
+                '일관성 (%)': display_consistent['일관성_pct'],
+                '해당 오답 선택 모델': display_consistent['models_with_this_wrong']
+            })
             
             st.dataframe(
-                display_consistent[list(display_cols.keys())].rename(columns=display_cols).style.background_gradient(
-                    subset=['일관성'],
-                    cmap='Reds'
-                ),
+                display_df.style.background_gradient(
+                    subset=['일관성 (%)'],
+                    cmap='Reds',
+                    vmin=50,
+                    vmax=100
+                ).format({'일관성 (%)': '{:.1f}%'}),
                 use_container_width=True,
                 height=500
             )

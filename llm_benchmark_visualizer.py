@@ -2463,11 +2463,17 @@ def main():
             else:
                 st.info("연도 정보가 있는 데이터가 없습니다.")
     
-    # 탭 7: 오답 분석
+    # 탭 7: 심층 오답 분석 (Complete Enhanced Version)
     with tabs[6]:
-        st.header(f"❌ {t['incorrect_analysis']}")
+        st.header(f"🔬 {'심층 오답 분석' if lang == 'ko' else 'Deep Incorrect Analysis'}")
         
-        # 문제별 오답률 계산
+        st.markdown("""
+        > **논문 기반 심층 분석**: 이 탭은 학술 논문의 "지식 격차(Knowledge Gap)" 분석 방법론을 적용합니다.
+        > 단순히 오답률이 높은 문제를 넘어, **모델들이 일관되게 같은 오답을 선택하는 패턴**을 식별하여 
+        > LLM의 근본적인 지식 문제를 파악합니다.
+        """)
+        
+        # 기본 오답 분석 데이터 준비
         problem_analysis = filtered_df.groupby('Question').agg({
             '정답여부': ['sum', 'count', 'mean']
         }).reset_index()
@@ -2475,35 +2481,40 @@ def main():
         problem_analysis['incorrect_rate'] = 1 - problem_analysis['correct_rate']
         problem_analysis['incorrect_count'] = problem_analysis['total_count'] - problem_analysis['correct_count']
         
-        # 문제 식별자 추가
+        # 문제 식별자 및 메타데이터 추가
         problem_ids = []
+        subjects = []
+        years = []
+        correct_answers = []
+        law_statuses = []
+        
         for question in problem_analysis['Question']:
             matching_rows = filtered_df[filtered_df['Question'] == question]
             if len(matching_rows) > 0:
-                problem_id = create_problem_identifier(matching_rows.iloc[0], lang)
+                row = matching_rows.iloc[0]
+                problem_id = create_problem_identifier(row, lang)
                 problem_ids.append(problem_id)
+                subjects.append(row.get('Subject', 'Unknown'))
+                years.append(row.get('Year', 'Unknown'))
+                correct_answers.append(row.get('Answer', 'Unknown'))
+                law_statuses.append(row.get('law', 'Unknown'))
             else:
                 problem_ids.append("Unknown")
+                subjects.append("Unknown")
+                years.append("Unknown")
+                correct_answers.append("Unknown")
+                law_statuses.append("Unknown")
         
         problem_analysis['problem_id'] = problem_ids
+        problem_analysis['Subject'] = subjects
+        problem_analysis['Year'] = years
+        problem_analysis['CorrectAnswer'] = correct_answers
+        problem_analysis['law_status'] = law_statuses
         
-        # 오답률 순으로 정렬 (동일한 오답률이면 문제 ID로 정렬)
-        problem_analysis = problem_analysis.sort_values(
-            by=['incorrect_rate', 'problem_id'],
-            ascending=[False, True]
-        )
-        
-        # 시도한 모델 목록 추가
-        attempted_models = []
-        for question in problem_analysis['Question']:
-            models = filtered_df[filtered_df['Question'] == question]['모델'].unique().tolist()
-            attempted_models.append(', '.join(sorted(models)))
-        
-        problem_analysis['attempted_models'] = attempted_models
-        
-        # 모델별 정오답 정보 추가
+        # 모델별 정오답 및 선택한 답 정보 추가
         correct_models_list = []
         incorrect_models_list = []
+        selected_answers_dict = []
         
         for question in problem_analysis['Question']:
             q_df = filtered_df[filtered_df['Question'] == question]
@@ -2512,29 +2523,441 @@ def main():
             
             correct_models_list.append('✓ ' + ', '.join(sorted(correct_models)) if correct_models else '-')
             incorrect_models_list.append('✗ ' + ', '.join(sorted(incorrect_models)) if incorrect_models else '-')
+            
+            # 각 모델이 선택한 답 수집
+            answers_by_model = {}
+            for _, row in q_df.iterrows():
+                model = row['모델']
+                selected = row.get('예측답', 'N/A')
+                answers_by_model[model] = selected
+            selected_answers_dict.append(answers_by_model)
         
         problem_analysis['correct_models'] = correct_models_list
         problem_analysis['incorrect_models'] = incorrect_models_list
+        problem_analysis['selected_answers'] = selected_answers_dict
         
-        # Top 20 오답률 높은 문제
-        st.subheader(t['top_incorrect'])
+        # 오답률 순으로 정렬
+        problem_analysis = problem_analysis.sort_values(
+            by=['incorrect_rate', 'problem_id'],
+            ascending=[False, True]
+        )
+        
+        # ========================================
+        # 섹션 1: 개요 및 주요 메트릭
+        # ========================================
+        st.markdown("---")
+        st.subheader("📊 " + ("오답 분석 개요" if lang == 'ko' else "Incorrect Analysis Overview"))
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            total_problems = len(problem_analysis)
+            st.metric(
+                "분석 문제 수" if lang == 'ko' else "Total Problems",
+                f"{total_problems:,}"
+            )
+        
+        with col2:
+            all_wrong = len(problem_analysis[problem_analysis['correct_count'] == 0])
+            st.metric(
+                "완전 지식 격차" if lang == 'ko' else "Complete Knowledge Gaps",
+                f"{all_wrong}",
+                help="모든 모델이 틀린 문제"
+            )
+        
+        with col3:
+            most_wrong = len(problem_analysis[problem_analysis['incorrect_rate'] >= 0.5])
+            st.metric(
+                "주요 지식 격차" if lang == 'ko' else "Major Knowledge Gaps",
+                f"{most_wrong}",
+                help="50% 이상의 모델이 틀린 문제"
+            )
+        
+        with col4:
+            avg_incorrect_rate = problem_analysis['incorrect_rate'].mean() * 100
+            st.metric(
+                "평균 오답률" if lang == 'ko' else "Avg Incorrect Rate",
+                f"{avg_incorrect_rate:.1f}%"
+            )
+        
+        # ========================================
+        # 섹션 2: 일관된 오답 선택 패턴 분석 (핵심!)
+        # ========================================
+        st.markdown("---")
+        st.subheader("🎯 " + ("일관된 오답 선택 패턴 (지식 격차 핵심 지표)" if lang == 'ko' else "Consistent Incorrect Answer Pattern"))
+        
+        st.info("""
+        💡 **핵심 인사이트**: 모델들이 단순히 틀리는 것이 아니라, **같은 오답을 일관되게 선택**하는 경우 
+        이는 해당 지식 영역에 대한 근본적인 이해 부족을 의미합니다. (논문 방법론 적용)
+        """)
+        
+        # 일관된 오답 패턴 계산
+        consistent_wrong_patterns = []
+        
+        for idx, row in problem_analysis.iterrows():
+            if row['incorrect_count'] >= 2:
+                selected = row['selected_answers']
+                correct = row['CorrectAnswer']
+                
+                # 오답을 선택한 모델들의 답변 수집
+                wrong_answers = []
+                for model, answer in selected.items():
+                    if str(answer) != str(correct):
+                        wrong_answers.append(str(answer))
+                
+                if wrong_answers:
+                    from collections import Counter
+                    answer_counts = Counter(wrong_answers)
+                    most_common_wrong, count = answer_counts.most_common(1)[0]
+                    
+                    consistency_ratio = count / len(wrong_answers)
+                    
+                    if consistency_ratio >= 0.5:
+                        models_selected_this = [m for m, a in selected.items() 
+                                              if str(a) == most_common_wrong]
+                        
+                        consistent_wrong_patterns.append({
+                            'problem_id': row['problem_id'],
+                            'Question': row['Question'],
+                            'Subject': row['Subject'],
+                            'Year': row['Year'],
+                            'correct_answer': correct,
+                            'common_wrong_answer': most_common_wrong,
+                            'wrong_answer_count': count,
+                            'total_wrong': len(wrong_answers),
+                            'consistency_ratio': consistency_ratio,
+                            'models_with_this_wrong': ', '.join(models_selected_this),
+                            'incorrect_rate': row['incorrect_rate']
+                        })
+        
+        if consistent_wrong_patterns:
+            consistent_df = pd.DataFrame(consistent_wrong_patterns)
+            consistent_df = consistent_df.sort_values('consistency_ratio', ascending=False)
+            
+            st.success(f"""
+            ✅ **{len(consistent_df)}개의 일관된 오답 패턴 발견!**
+            
+            이는 특정 모델의 문제가 아닌, **여러 LLM에 공통적으로 존재하는 지식 격차**를 의미합니다.
+            """)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                fig = px.histogram(
+                    consistent_df,
+                    x='consistency_ratio',
+                    nbins=20,
+                    title='일관된 오답 선택 비율 분포' if lang == 'ko' else 'Consistency Ratio Distribution',
+                    labels={'consistency_ratio': '일관성 비율' if lang == 'ko' else 'Consistency Ratio'}
+                )
+                fig.update_traces(marker_line_color='black', marker_line_width=1.5)
+                fig.update_layout(
+                    xaxis_title='일관성 비율 (1.0 = 100% 일치)',
+                    yaxis_title='문제 수',
+                    height=400
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                if 'Subject' in consistent_df.columns:
+                    subject_pattern_count = consistent_df['Subject'].value_counts().reset_index()
+                    subject_pattern_count.columns = ['Subject', 'Count']
+                    
+                    fig = px.bar(
+                        subject_pattern_count.head(10),
+                        x='Subject',
+                        y='Count',
+                        title='과목별 일관된 오답 패턴' if lang == 'ko' else 'Consistent Wrong Patterns by Subject',
+                        color='Count',
+                        color_continuous_scale='Reds'
+                    )
+                    fig.update_traces(marker_line_color='black', marker_line_width=1.5)
+                    fig.update_layout(height=400)
+                    fig.update_xaxes(tickangle=45)
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            st.markdown("#### " + ("🔴 가장 일관된 오답 선택 패턴 Top 20" if lang == 'ko' else "🔴 Top 20 Most Consistent Wrong Answer Patterns"))
+            
+            display_consistent = consistent_df.head(20).copy()
+            display_consistent['일관성'] = (display_consistent['consistency_ratio'] * 100).round(1).astype(str) + '%'
+            display_consistent['오답_정보'] = (display_consistent['common_wrong_answer'].astype(str) + 
+                                           ' (' + display_consistent['wrong_answer_count'].astype(str) + 
+                                           '/' + display_consistent['total_wrong'].astype(str) + ')')
+            
+            display_cols = {
+                'problem_id': '문제 번호' if lang == 'ko' else 'Problem ID',
+                'Subject': '과목' if lang == 'ko' else 'Subject',
+                'correct_answer': '정답' if lang == 'ko' else 'Correct',
+                '오답_정보': '공통 오답 (횟수/전체)',
+                '일관성': '일관성',
+                'models_with_this_wrong': '해당 오답 선택 모델'
+            }
+            
+            st.dataframe(
+                display_consistent[list(display_cols.keys())].rename(columns=display_cols).style.background_gradient(
+                    subset=['일관성'],
+                    cmap='Reds'
+                ),
+                use_container_width=True,
+                height=500
+            )
+            
+            if st.checkbox('📋 ' + ('일관된 오답 문제 상세 내용 보기' if lang == 'ko' else 'Show Detailed Content'), key='consistent_details'):
+                for idx, row in display_consistent.head(10).iterrows():
+                    with st.expander(f"🔍 {row['problem_id']} - 일관성 {row['consistency_ratio']*100:.1f}%"):
+                        q_detail = filtered_df[filtered_df['Question'] == row['Question']].iloc[0]
+                        
+                        st.markdown(f"**{'문제' if lang == 'ko' else 'Question'}:** {q_detail['Question']}")
+                        st.markdown(f"**{'과목' if lang == 'ko' else 'Subject'}:** {row['Subject']}")
+                        
+                        if all([f'Option {i}' in q_detail for i in range(1, 5)]):
+                            st.markdown("**선택지:**")
+                            for i in range(1, 5):
+                                option = q_detail[f'Option {i}']
+                                if pd.notna(option):
+                                    if str(i) == str(row['correct_answer']):
+                                        st.markdown(f"✅ **{i}. {option}** (정답)")
+                                    elif str(i) == str(row['common_wrong_answer']):
+                                        st.markdown(f"❌ **{i}. {option}** (일관된 오답 - {row['wrong_answer_count']}개 모델)")
+                                    else:
+                                        st.markdown(f"  {i}. {option}")
+                        
+                        st.markdown(f"**🎯 정답:** {row['correct_answer']}")
+                        st.markdown(f"**❌ 공통 오답:** {row['common_wrong_answer']} ({row['wrong_answer_count']}/{row['total_wrong']} = {row['consistency_ratio']*100:.1f}% 일관성)")
+                        st.markdown(f"**🤖 해당 오답 선택 모델:** {row['models_with_this_wrong']}")
+        else:
+            st.warning("일관된 오답 선택 패턴이 발견되지 않았습니다.")
+        
+        # ========================================
+        # 섹션 3: 프롬프팅 방식별 지식 격차 비교
+        # ========================================
+        st.markdown("---")
+        st.subheader("📋 " + ("프롬프팅 방식별 지식 격차 분석" if lang == 'ko' else "Knowledge Gap by Prompting"))
+        
+        if '프롬프팅' in filtered_df.columns and filtered_df['프롬프팅'].nunique() > 1:
+            st.info("""
+            💡 **논문 방법론**: 특정 프롬프팅 방식에서 모델들이 일관되게 틀리는 문제를 식별
+            """)
+            
+            prompting_analysis = []
+            
+            for prompting in filtered_df['프롬프팅'].unique():
+                prompt_df = filtered_df[filtered_df['프롬프팅'] == prompting]
+                prompt_problems = prompt_df.groupby('Question').agg({'정답여부': ['sum', 'count']}).reset_index()
+                prompt_problems.columns = ['Question', 'correct_count', 'total_count']
+                all_wrong_in_prompt = len(prompt_problems[prompt_problems['correct_count'] == 0])
+                avg_acc = prompt_df['정답여부'].mean() * 100
+                
+                prompting_analysis.append({
+                    '프롬프팅': prompting,
+                    '전체_문제수': prompt_df['Question'].nunique(),
+                    '완전_지식격차': all_wrong_in_prompt,
+                    '평균_정확도': avg_acc,
+                    '지식격차_비율': (all_wrong_in_prompt / prompt_df['Question'].nunique() * 100) if prompt_df['Question'].nunique() > 0 else 0
+                })
+            
+            prompt_comp_df = pd.DataFrame(prompting_analysis).sort_values('완전_지식격차', ascending=False)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                fig = px.bar(
+                    prompt_comp_df,
+                    x='프롬프팅',
+                    y='완전_지식격차',
+                    title='프롬프팅 방식별 완전 지식 격차',
+                    text='완전_지식격차',
+                    color='완전_지식격차',
+                    color_continuous_scale='Reds'
+                )
+                fig.update_traces(textposition='outside', marker_line_color='black', marker_line_width=1.5)
+                fig.update_layout(height=400)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                fig = px.scatter(
+                    prompt_comp_df,
+                    x='평균_정확도',
+                    y='지식격차_비율',
+                    size='전체_문제수',
+                    text='프롬프팅',
+                    title='정확도 vs 지식격차 비율',
+                    labels={'평균_정확도': '평균 정확도 (%)', '지식격차_비율': '지식격차 비율 (%)'}
+                )
+                fig.update_traces(textposition='top center', marker=dict(line=dict(width=2, color='black')))
+                fig.update_layout(height=400)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            st.dataframe(
+                prompt_comp_df.style.format({
+                    '평균_정확도': '{:.2f}%',
+                    '지식격차_비율': '{:.2f}%'
+                }).background_gradient(subset=['완전_지식격차'], cmap='Reds'),
+                use_container_width=True
+            )
+        else:
+            st.info("프롬프팅 방식이 1개만 선택되어 비교 불가")
+        
+        # ========================================
+        # 섹션 4: 모델 간 오답 일치도 매트릭스
+        # ========================================
+        st.markdown("---")
+        st.subheader("🔗 " + ("모델 간 오답 일치도 매트릭스" if lang == 'ko' else "Inter-Model Error Agreement"))
+        
+        st.info("""
+        💡 **분석 목적**: 어떤 모델들이 유사한 실수를 하는지 파악
+        높은 일치도 = 유사한 지식 격차 공유
+        """)
+        
+        models = filtered_df['모델'].unique().tolist()
+        
+        if len(models) >= 2:
+            problem_model_matrix = filtered_df.pivot_table(
+                index='Question',
+                columns='모델',
+                values='정답여부',
+                aggfunc='first'
+            ).fillna(0)
+            
+            agreement_matrix = pd.DataFrame(index=models, columns=models, dtype=float)
+            
+            for model1 in models:
+                for model2 in models:
+                    if model1 in problem_model_matrix.columns and model2 in problem_model_matrix.columns:
+                        both_wrong = ((problem_model_matrix[model1] == 0) & (problem_model_matrix[model2] == 0)).sum()
+                        either_wrong = ((problem_model_matrix[model1] == 0) | (problem_model_matrix[model2] == 0)).sum()
+                        agreement = both_wrong / either_wrong if either_wrong > 0 else 0
+                        agreement_matrix.loc[model1, model2] = agreement * 100
+                    else:
+                        agreement_matrix.loc[model1, model2] = 0
+            
+            agreement_matrix = agreement_matrix.astype(float)
+            
+            fig = go.Figure(data=go.Heatmap(
+                z=agreement_matrix.values,
+                x=agreement_matrix.columns,
+                y=agreement_matrix.index,
+                colorscale='RdYlBu_r',
+                text=np.round(agreement_matrix.values, 1),
+                texttemplate='%{text:.1f}',
+                textfont={"size": int(12 * chart_text_size)},
+                colorbar=dict(title="일치도 (%)"),
+                xgap=2,
+                ygap=2
+            ))
+            
+            fig.update_layout(
+                title='모델 간 오답 일치도 (%)',
+                height=max(400, len(models) * 40)
+            )
+            fig.update_xaxes(tickangle=45)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            agreement_pairs = []
+            for i, model1 in enumerate(models):
+                for j, model2 in enumerate(models):
+                    if i < j:
+                        agreement_pairs.append({
+                            'Model 1': model1,
+                            'Model 2': model2,
+                            'Agreement': agreement_matrix.loc[model1, model2]
+                        })
+            
+            if agreement_pairs:
+                pairs_df = pd.DataFrame(agreement_pairs).sort_values('Agreement', ascending=False)
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("**가장 유사한 오답 패턴 (Top 5)**")
+                    for idx, row in pairs_df.head(5).iterrows():
+                        st.write(f"🔗 **{row['Model 1']}** ↔ **{row['Model 2']}**: {row['Agreement']:.1f}%")
+                
+                with col2:
+                    st.markdown("**가장 다른 오답 패턴 (Bottom 5)**")
+                    for idx, row in pairs_df.tail(5).iterrows():
+                        st.write(f"↔️ **{row['Model 1']}** ↔ **{row['Model 2']}**: {row['Agreement']:.1f}%")
+        else:
+            st.warning("2개 이상의 모델이 필요합니다.")
+        
+        # ========================================
+        # 섹션 5: 지식 격차 영역 매핑
+        # ========================================
+        st.markdown("---")
+        st.subheader("🗺️ " + ("지식 격차 영역 매핑" if lang == 'ko' else "Knowledge Gap Domain Mapping"))
+        
+        all_wrong = problem_analysis[problem_analysis['correct_count'] == 0]
+        
+        if len(all_wrong) > 0:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if 'Subject' in all_wrong.columns:
+                    subject_gaps = all_wrong['Subject'].value_counts().reset_index()
+                    subject_gaps.columns = ['Subject', 'Count']
+                    total_by_subject = problem_analysis['Subject'].value_counts()
+                    subject_gaps['Total'] = subject_gaps['Subject'].map(total_by_subject)
+                    subject_gaps['Gap_Ratio'] = (subject_gaps['Count'] / subject_gaps['Total'] * 100).round(1)
+                    
+                    fig = px.bar(
+                        subject_gaps.sort_values('Gap_Ratio', ascending=False),
+                        x='Subject',
+                        y='Gap_Ratio',
+                        title='과목별 지식 격차 비율',
+                        text='Gap_Ratio',
+                        color='Gap_Ratio',
+                        color_continuous_scale='Reds',
+                        hover_data=['Count', 'Total']
+                    )
+                    fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside', marker_line_color='black', marker_line_width=1.5)
+                    fig.update_layout(height=400, yaxis_title='지식 격차 비율 (%)')
+                    fig.update_xaxes(tickangle=45)
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                if 'Year' in all_wrong.columns:
+                    year_gaps = all_wrong['Year'].value_counts().reset_index()
+                    year_gaps.columns = ['Year', 'Count']
+                    year_gaps = year_gaps[year_gaps['Year'] != 'Unknown']
+                    
+                    if len(year_gaps) > 0:
+                        year_gaps['Year_Int'] = year_gaps['Year'].apply(safe_convert_to_int)
+                        year_gaps = year_gaps[year_gaps['Year_Int'].notna()].sort_values('Year_Int')
+                        
+                        fig = px.line(
+                            year_gaps,
+                            x='Year_Int',
+                            y='Count',
+                            title='연도별 지식 격차 문제 수',
+                            markers=True,
+                            text='Count'
+                        )
+                        fig.update_traces(textposition='top center', marker_size=10, marker_line_color='black', marker_line_width=2, line_width=3)
+                        fig.update_layout(height=400, xaxis_title='연도', yaxis_title='문제 수')
+                        st.plotly_chart(fig, use_container_width=True)
+        
+        # ========================================
+        # 섹션 6: Top 20 오답률 높은 문제
+        # ========================================
+        st.markdown("---")
+        st.subheader("📊 " + ("오답률 높은 문제 Top 20" if lang == 'ko' else "Top 20 Problems by Incorrect Rate"))
         
         top_20 = problem_analysis.head(20)
         
-        # 디스플레이용 데이터프레임
         display_top_20 = pd.DataFrame({
-            t['problem_id']: top_20['problem_id'],
-            t['incorrect_count']: top_20['incorrect_count'].astype(int),
-            t['correct_count']: top_20['correct_count'].astype(int),
-            t['total_models']: top_20['total_count'].astype(int),
-            t['wrong_rate']: (top_20['incorrect_rate'] * 100).round(2),
+            ('문제 번호' if lang == 'ko' else 'Problem ID'): top_20['problem_id'],
+            ('과목' if lang == 'ko' else 'Subject'): top_20['Subject'],
+            ('오답 모델수' if lang == 'ko' else 'Incorrect Count'): top_20['incorrect_count'].astype(int),
+            ('정답 모델수' if lang == 'ko' else 'Correct Count'): top_20['correct_count'].astype(int),
+            ('총 모델수' if lang == 'ko' else 'Total Models'): top_20['total_count'].astype(int),
+            ('오답률' if lang == 'ko' else 'Wrong Rate'): (top_20['incorrect_rate'] * 100).round(2),
             '정답 모델' if lang == 'ko' else 'Correct Models': top_20['correct_models'],
             '오답 모델' if lang == 'ko' else 'Incorrect Models': top_20['incorrect_models']
         })
         
         st.dataframe(
             display_top_20.style.background_gradient(
-                subset=[t['wrong_rate']],
+                subset=['오답률' if lang == 'ko' else 'Wrong Rate'],
                 cmap='Reds',
                 vmin=0,
                 vmax=100
@@ -2543,147 +2966,335 @@ def main():
             height=600
         )
         
-        # 모든 모델이 틀린 문제
+        # ========================================
+        # 섹션 7: 모든 모델이 틀린 문제 (완전 지식 격차)
+        # ========================================
         st.markdown("---")
-        st.subheader(t['all_models_incorrect'])
+        st.subheader("🚨 " + ("모든 모델이 틀린 문제 (완전 지식 격차)" if lang == 'ko' else "All Models Incorrect (Complete Knowledge Gap)"))
         
         all_wrong = problem_analysis[problem_analysis['correct_count'] == 0]
         
         if len(all_wrong) > 0:
+            st.error(f"""
+            ⚠️ **심각한 지식 격차 발견: {len(all_wrong)}개 문제**
+            
+            이 문제들은 **모든 평가 모델이 틀렸습니다**. 현재 LLM들이 공통적으로 
+            해당 지식 영역을 제대로 이해하지 못하고 있음을 의미합니다.
+            """)
+            
             display_all_wrong = pd.DataFrame({
-                t['problem_id']: all_wrong['problem_id'],
-                t['incorrect_count']: all_wrong['incorrect_count'].astype(int),
-                t['correct_count']: all_wrong['correct_count'].astype(int),
-                t['total_models']: all_wrong['total_count'].astype(int),
+                ('문제 번호' if lang == 'ko' else 'Problem ID'): all_wrong['problem_id'],
+                ('과목' if lang == 'ko' else 'Subject'): all_wrong['Subject'],
+                ('연도' if lang == 'ko' else 'Year'): all_wrong['Year'],
+                ('오답 모델수' if lang == 'ko' else 'Incorrect Count'): all_wrong['incorrect_count'].astype(int),
                 '오답 모델' if lang == 'ko' else 'Incorrect Models': all_wrong['incorrect_models']
             })
             
-            st.dataframe(display_all_wrong, use_container_width=True)
+            st.dataframe(display_all_wrong, use_container_width=True, height=400)
             
-            # 문제 상세 보기 옵션 - 모든 문제 표시
-            if st.checkbox('문제 내용 보기' if lang == 'ko' else 'Show Question Details'):
-                st.info(f"총 {len(all_wrong)}개 문제의 상세 내용을 표시합니다." if lang == 'ko' else f"Showing details for all {len(all_wrong)} problems.")
-                for idx, row in all_wrong.iterrows():
-                    with st.expander(f"{row['problem_id']}"):
+            if st.checkbox('문제 내용 보기 (완전 지식 격차)' if lang == 'ko' else 'Show Details (Complete Gap)', key='all_wrong_details'):
+                st.info(f"총 {len(all_wrong)}개 문제의 상세 내용")
+                for idx, row in all_wrong.head(20).iterrows():
+                    with st.expander(f"🚨 {row['problem_id']}"):
                         q_detail = filtered_df[filtered_df['Question'] == row['Question']].iloc[0]
-                        st.write(f"**{t['question']}:** {q_detail['Question']}")
+                        st.write(f"**{'문제' if lang == 'ko' else 'Question'}:** {q_detail['Question']}")
+                        
                         if 'Subject' in q_detail and pd.notna(q_detail['Subject']):
-                            st.write(f"**과목/Subject:** {q_detail['Subject']}")
+                            st.write(f"**과목:** {q_detail['Subject']}")
                         
-                        # 선택지 표시
-                        if all(['Option 1' in q_detail, 'Option 2' in q_detail, 'Option 3' in q_detail, 'Option 4' in q_detail]):
-                            st.write("**선택지/Options:**")
+                        if all([f'Option {i}' in q_detail for i in range(1, 5)]):
+                            st.write("**선택지:**")
                             for i in range(1, 5):
-                                option_key = f'Option {i}'
-                                if option_key in q_detail and pd.notna(q_detail[option_key]):
-                                    st.write(f"  {i}. {q_detail[option_key]}")
+                                option = q_detail[f'Option {i}']
+                                if pd.notna(option):
+                                    if str(i) == str(row['CorrectAnswer']):
+                                        st.write(f"  ✅ {i}. {option} **(정답)**")
+                                    else:
+                                        st.write(f"  {i}. {option}")
                         
-                        # 정답 표시
                         if 'Answer' in q_detail and pd.notna(q_detail['Answer']):
-                            st.write(f"**✅ 정답/Answer:** {q_detail['Answer']}")
+                            st.write(f"**정답:** {q_detail['Answer']}")
                         
-                        # 🔥 모델별 선택 답안 상세 표시
-                        st.markdown("---")
-                        st.write(f"**❌ 모델별 오답 내역:**" if lang == 'ko' else "**❌ Incorrect Answers by Model:**")
-                        
-                        incorrect_details = filtered_df[
-                            (filtered_df['Question'] == row['Question']) & 
-                            (filtered_df['정답여부'] == False)
-                        ][['모델', '예측답', 'Answer']].drop_duplicates()
-                        
-                        for _, detail in incorrect_details.iterrows():
-                            model = detail['모델']
-                            predicted = detail['예측답'] if pd.notna(detail['예측답']) else 'N/A'
-                            correct = detail['Answer'] if pd.notna(detail['Answer']) else 'N/A'
-                            st.write(f"  • **{model}**: 선택 {predicted} (정답: {correct})" if lang == 'ko' 
-                                   else f"  • **{model}**: Selected {predicted} (Correct: {correct})")
-
+                        st.write("**각 모델이 선택한 답:**")
+                        for model, answer in row['selected_answers'].items():
+                            st.write(f"  • {model}: {answer}")
         else:
-            st.info("No problems that all models got wrong.")
+            st.success("✅ 모든 모델이 틀린 문제가 없습니다!")
         
-        # 대부분 모델이 틀린 문제 (50% 이상)
+        # ========================================
+        # 섹션 8: 대부분 모델이 틀린 문제 (≥50%) ⭐ 기존 기능
+        # ========================================
         st.markdown("---")
-        st.subheader(t['most_models_incorrect'])
+        st.subheader("⚠️ " + ("대부분 모델이 틀린 문제 (≥50%)" if lang == 'ko' else "Most Models Incorrect (≥50%)"))
         
         most_wrong = problem_analysis[problem_analysis['incorrect_rate'] >= 0.5]
         
         if len(most_wrong) > 0:
+            st.warning(f"""
+            ⚠️ **주요 지식 격차: {len(most_wrong)}개 문제**
+            
+            이 문제들은 **50% 이상의 모델이 틀렸습니다**. 해당 지식 영역이 
+            많은 LLM에게 어려운 영역임을 의미합니다.
+            """)
+            
             display_most_wrong = pd.DataFrame({
-                t['problem_id']: most_wrong['problem_id'],
-                t['incorrect_count']: most_wrong['incorrect_count'].astype(int),
-                t['correct_count']: most_wrong['correct_count'].astype(int),
-                t['total_models']: most_wrong['total_count'].astype(int),
-                t['wrong_rate']: (most_wrong['incorrect_rate'] * 100).round(2),
+                ('문제 번호' if lang == 'ko' else 'Problem ID'): most_wrong['problem_id'],
+                ('과목' if lang == 'ko' else 'Subject'): most_wrong['Subject'],
+                ('오답 모델수' if lang == 'ko' else 'Incorrect Count'): most_wrong['incorrect_count'].astype(int),
+                ('정답 모델수' if lang == 'ko' else 'Correct Count'): most_wrong['correct_count'].astype(int),
+                ('총 모델수' if lang == 'ko' else 'Total Models'): most_wrong['total_count'].astype(int),
+                ('오답률' if lang == 'ko' else 'Wrong Rate'): (most_wrong['incorrect_rate'] * 100).round(2),
                 '정답 모델' if lang == 'ko' else 'Correct Models': most_wrong['correct_models'],
                 '오답 모델' if lang == 'ko' else 'Incorrect Models': most_wrong['incorrect_models']
             })
             
             st.dataframe(
                 display_most_wrong.style.background_gradient(
-                    subset=[t['wrong_rate']],
+                    subset=['오답률' if lang == 'ko' else 'Wrong Rate'],
                     cmap='Reds',
                     vmin=0,
                     vmax=100
                 ),
-                use_container_width=True
+                use_container_width=True,
+                height=400
             )
             
-            # 문제 상세 보기 옵션 - 모든 문제 표시
-            if st.checkbox('문제 내용 보기 (대부분 틀린 문제)' if lang == 'ko' else 'Show Question Details (Most Incorrect)', key='most_wrong_details'):
-                st.info(f"총 {len(most_wrong)}개 문제의 상세 내용을 표시합니다." if lang == 'ko' else f"Showing details for all {len(most_wrong)} problems.")
-                for idx, row in most_wrong.iterrows():  # 모든 문제 표시
-                    with st.expander(f"{row['problem_id']} - 오답률 {row['incorrect_rate']*100:.1f}%"):
+            if st.checkbox('문제 내용 보기 (대부분 틀린 문제)' if lang == 'ko' else 'Show Details (Most Incorrect)', key='most_wrong_details'):
+                st.info(f"총 {len(most_wrong)}개 문제 중 상위 20개")
+                for idx, row in most_wrong.head(20).iterrows():
+                    with st.expander(f"⚠️ {row['problem_id']} - 오답률 {row['incorrect_rate']*100:.1f}%"):
                         q_detail = filtered_df[filtered_df['Question'] == row['Question']].iloc[0]
-                        st.write(f"**{t['question']}:** {q_detail['Question']}")
+                        st.write(f"**문제:** {q_detail['Question']}")
+                        
                         if 'Subject' in q_detail and pd.notna(q_detail['Subject']):
-                            st.write(f"**과목/Subject:** {q_detail['Subject']}")
+                            st.write(f"**과목:** {q_detail['Subject']}")
                         
-                        # 선택지 표시
-                        if all(['Option 1' in q_detail, 'Option 2' in q_detail, 'Option 3' in q_detail, 'Option 4' in q_detail]):
-                            st.write("**선택지/Options:**")
+                        if all([f'Option {i}' in q_detail for i in range(1, 5)]):
+                            st.write("**선택지:**")
                             for i in range(1, 5):
-                                option_key = f'Option {i}'
-                                if option_key in q_detail and pd.notna(q_detail[option_key]):
-                                    st.write(f"  {i}. {q_detail[option_key]}")
+                                option = q_detail[f'Option {i}']
+                                if pd.notna(option):
+                                    if str(i) == str(row['CorrectAnswer']):
+                                        st.write(f"  ✅ {i}. {option} **(정답)**")
+                                    else:
+                                        st.write(f"  {i}. {option}")
                         
-                        # 정답 표시
                         if 'Answer' in q_detail and pd.notna(q_detail['Answer']):
-                            st.write(f"**✅ 정답/Answer:** {q_detail['Answer']}")
+                            st.write(f"**정답:** {q_detail['Answer']}")
                         
                         st.markdown("---")
                         
-                        # 🔥 정답 모델과 선택 답안
+                        # 정답 모델과 오답 모델 분리 표시
                         if row['correct_count'] > 0:
-                            st.write(f"**✓ 정답 모델:**" if lang == 'ko' else "**✓ Correct Models:**")
-                            correct_details = filtered_df[
-                                (filtered_df['Question'] == row['Question']) & 
-                                (filtered_df['정답여부'] == True)
-                            ][['모델', '예측답']].drop_duplicates()
-                            
-                            for _, detail in correct_details.iterrows():
-                                model = detail['모델']
-                                predicted = detail['예측답'] if pd.notna(detail['예측답']) else 'N/A'
-                                st.write(f"  • **{model}**: 선택 {predicted} ✅" if lang == 'ko' 
-                                       else f"  • **{model}**: Selected {predicted} ✅")
+                            st.write("**✓ 정답 모델:**")
+                            for model, answer in row['selected_answers'].items():
+                                if str(answer) == str(row['CorrectAnswer']):
+                                    st.write(f"  • **{model}**: 선택 {answer} ✅")
                         
-                        # 🔥 오답 모델과 선택 답안
-                        st.write(f"**✗ 오답 모델:**" if lang == 'ko' else "**✗ Incorrect Models:**")
-                        incorrect_details = filtered_df[
-                            (filtered_df['Question'] == row['Question']) & 
-                            (filtered_df['정답여부'] == False)
-                        ][['모델', '예측답', 'Answer']].drop_duplicates()
-                        
-                        for _, detail in incorrect_details.iterrows():
-                            model = detail['모델']
-                            predicted = detail['예측답'] if pd.notna(detail['예측답']) else 'N/A'
-                            correct = detail['Answer'] if pd.notna(detail['Answer']) else 'N/A'
-                            st.write(f"  • **{model}**: 선택 {predicted} (정답: {correct})" if lang == 'ko' 
-                                   else f"  • **{model}**: Selected {predicted} (Correct: {correct})")
-
+                        st.write("**✗ 오답 모델:**")
+                        for model, answer in row['selected_answers'].items():
+                            if str(answer) != str(row['CorrectAnswer']):
+                                st.write(f"  • **{model}**: 선택 {answer} (정답: {row['CorrectAnswer']})")
         else:
-            st.info("No problems that most models got wrong.")
+            st.info("50% 이상의 모델이 틀린 문제가 없습니다.")
         
-        # Top 10 오답률 높은 문제 차트
+        # ========================================
+        # 섹션 9: 법령/비법령 오답 분석 ⭐ 신규 기능
+        # ========================================
+        if 'law' in filtered_df.columns:
+            st.markdown("---")
+            st.subheader("⚖️ " + ("법령/비법령 오답 분석" if lang == 'ko' else "Law/Non-Law Incorrect Analysis"))
+            
+            st.info("""
+            💡 **법령 지식 격차 분석**: 법령 문제와 비법령 문제에서 모델들의 오답 패턴이 
+            어떻게 다른지 분석하여 법률 지식의 격차를 파악합니다.
+            """)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # 법령/비법령별 완전 지식 격차 비율
+                law_all_wrong = problem_analysis[problem_analysis['correct_count'] == 0]
+                law_gap_by_type = law_all_wrong['law_status'].value_counts()
+                
+                law_gap_data = pd.DataFrame({
+                    '구분': ['법령' if x == 'O' else '비법령' for x in law_gap_by_type.index],
+                    '완전_지식격차': law_gap_by_type.values
+                })
+                
+                total_law = len(problem_analysis[problem_analysis['law_status'] == 'O'])
+                total_non_law = len(problem_analysis[problem_analysis['law_status'] != 'O'])
+                
+                law_gap_data['전체문제'] = law_gap_data['구분'].apply(
+                    lambda x: total_law if x == '법령' else total_non_law
+                )
+                law_gap_data['비율'] = (law_gap_data['완전_지식격차'] / law_gap_data['전체문제'] * 100).round(1)
+                
+                fig = px.bar(
+                    law_gap_data,
+                    x='구분',
+                    y='비율',
+                    title='법령/비법령 완전 지식 격차 비율',
+                    text='비율',
+                    color='비율',
+                    color_continuous_scale='Reds',
+                    hover_data=['완전_지식격차', '전체문제']
+                )
+                fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside', marker_line_color='black', marker_line_width=1.5)
+                fig.update_layout(height=400, yaxis_title='지식 격차 비율 (%)')
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                # 법령/비법령별 평균 오답률
+                law_incorrect_rate = problem_analysis.groupby('law_status')['incorrect_rate'].mean().reset_index()
+                law_incorrect_rate['구분'] = law_incorrect_rate['law_status'].apply(lambda x: '법령' if x == 'O' else '비법령')
+                law_incorrect_rate['평균_오답률'] = law_incorrect_rate['incorrect_rate'] * 100
+                
+                fig = px.bar(
+                    law_incorrect_rate,
+                    x='구분',
+                    y='평균_오답률',
+                    title='법령/비법령 평균 오답률',
+                    text='평균_오답률',
+                    color='평균_오답률',
+                    color_continuous_scale='Reds'
+                )
+                fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside', marker_line_color='black', marker_line_width=1.5)
+                fig.update_layout(height=400, yaxis_title='평균 오답률 (%)', yaxis=dict(range=[0, 100]))
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # 법령 문제 중 완전 지식 격차
+            st.markdown("#### 📜 " + ("법령 문제 중 완전 지식 격차" if lang == 'ko' else "Law Problems - Complete Gap"))
+            
+            law_complete_gap = law_all_wrong[law_all_wrong['law_status'] == 'O']
+            
+            if len(law_complete_gap) > 0:
+                st.error(f"""
+                ⚠️ **법령 지식 격차: {len(law_complete_gap)}개 문제**
+                
+                모든 모델이 틀린 법령 문제입니다. 법률 용어, 규정 해석, 법적 판단에 대한 
+                근본적인 지식 부족을 의미합니다.
+                """)
+                
+                display_law_gap = pd.DataFrame({
+                    '문제 번호': law_complete_gap['problem_id'],
+                    '과목': law_complete_gap['Subject'],
+                    '연도': law_complete_gap['Year'],
+                    '오답 모델수': law_complete_gap['incorrect_count'].astype(int)
+                })
+                
+                st.dataframe(display_law_gap, use_container_width=True)
+                
+                if st.checkbox('법령 지식 격차 문제 상세 보기', key='law_gap_details'):
+                    for idx, row in law_complete_gap.head(10).iterrows():
+                        with st.expander(f"📜 {row['problem_id']}"):
+                            q_detail = filtered_df[filtered_df['Question'] == row['Question']].iloc[0]
+                            st.write(f"**문제:** {q_detail['Question']}")
+                            
+                            if '법령 이름' in q_detail and pd.notna(q_detail['법령 이름']):
+                                st.write(f"**📚 법령:** {q_detail['법령 이름']}")
+                            
+                            if 'Subject' in q_detail and pd.notna(q_detail['Subject']):
+                                st.write(f"**과목:** {q_detail['Subject']}")
+                            
+                            if all([f'Option {i}' in q_detail for i in range(1, 5)]):
+                                st.write("**선택지:**")
+                                for i in range(1, 5):
+                                    option = q_detail[f'Option {i}']
+                                    if pd.notna(option):
+                                        if str(i) == str(row['CorrectAnswer']):
+                                            st.write(f"  ✅ {i}. {option} **(정답)**")
+                                        else:
+                                            st.write(f"  {i}. {option}")
+                            
+                            st.write("**각 모델이 선택한 답:**")
+                            for model, answer in row['selected_answers'].items():
+                                st.write(f"  • {model}: {answer}")
+            else:
+                st.success("✅ 모든 모델이 틀린 법령 문제가 없습니다!")
+            
+            # 비법령 문제 중 완전 지식 격차
+            st.markdown("#### 📘 " + ("비법령 문제 중 완전 지식 격차" if lang == 'ko' else "Non-Law Problems - Complete Gap"))
+            
+            non_law_complete_gap = law_all_wrong[law_all_wrong['law_status'] != 'O']
+            
+            if len(non_law_complete_gap) > 0:
+                st.warning(f"""
+                ℹ️ **비법령 지식 격차: {len(non_law_complete_gap)}개 문제**
+                
+                모든 모델이 틀린 비법령 문제입니다. 기술적 지식, 실무 경험, 
+                전문 용어 이해 등에 대한 격차를 의미합니다.
+                """)
+                
+                display_non_law_gap = pd.DataFrame({
+                    '문제 번호': non_law_complete_gap['problem_id'],
+                    '과목': non_law_complete_gap['Subject'],
+                    '연도': non_law_complete_gap['Year'],
+                    '오답 모델수': non_law_complete_gap['incorrect_count'].astype(int)
+                })
+                
+                st.dataframe(display_non_law_gap, use_container_width=True)
+            else:
+                st.success("✅ 모든 모델이 틀린 비법령 문제가 없습니다!")
+            
+            # 인사이트 및 권장 조치
+            st.markdown("---")
+            st.markdown("#### 💡 " + ("법령/비법령 지식 격차 인사이트" if lang == 'ko' else "Law/Non-Law Gap Insights"))
+            
+            law_gap_count = len(law_complete_gap)
+            non_law_gap_count = len(non_law_complete_gap)
+            law_gap_ratio = (law_gap_count / total_law * 100) if total_law > 0 else 0
+            non_law_gap_ratio = (non_law_gap_count / total_non_law * 100) if total_non_law > 0 else 0
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("법령 지식 격차 비율", f"{law_gap_ratio:.1f}%", f"{law_gap_count}/{total_law}")
+            
+            with col2:
+                st.metric("비법령 지식 격차 비율", f"{non_law_gap_ratio:.1f}%", f"{non_law_gap_count}/{total_non_law}")
+            
+            with col3:
+                if law_gap_ratio > non_law_gap_ratio:
+                    st.metric("더 취약한 영역", "법령", f"+{law_gap_ratio - non_law_gap_ratio:.1f}%p")
+                else:
+                    st.metric("더 취약한 영역", "비법령", f"+{non_law_gap_ratio - law_gap_ratio:.1f}%p")
+            
+            if law_gap_ratio > non_law_gap_ratio * 1.5:
+                st.error(f"""
+                🚨 **법령 지식이 특히 취약합니다!**
+                
+                법령 문제의 지식 격차 비율({law_gap_ratio:.1f}%)이 비법령({non_law_gap_ratio:.1f}%)보다 
+                {law_gap_ratio / non_law_gap_ratio:.1f}배 높습니다.
+                
+                **권장 조치**:
+                - 법률 용어 및 규정에 대한 학습 데이터 보강
+                - 법령 해석 예시 추가
+                - 법률 전문가 검토 및 피드백 반영
+                """)
+            elif non_law_gap_ratio > law_gap_ratio * 1.5:
+                st.warning(f"""
+                ⚠️ **기술/실무 지식이 상대적으로 취약합니다!**
+                
+                비법령 문제의 지식 격차 비율({non_law_gap_ratio:.1f}%)이 법령({law_gap_ratio:.1f}%)보다 
+                {non_law_gap_ratio / law_gap_ratio:.1f}배 높습니다.
+                
+                **권장 조치**:
+                - 기술적 세부사항 학습 데이터 보강
+                - 실무 사례 및 적용 예시 추가
+                - 전문 용어 정의 명확화
+                """)
+            else:
+                st.success(f"""
+                ✅ **법령과 비법령 지식 격차가 균형적입니다.**
+                
+                법령({law_gap_ratio:.1f}%)과 비법령({non_law_gap_ratio:.1f}%) 문제의 
+                지식 격차 비율이 비슷한 수준입니다.
+                """)
+        
+        # ========================================
+        # 섹션 10: 오답률 Top 10 차트
+        # ========================================
         st.markdown("---")
         top_10_chart = top_20.head(10)
         
@@ -2695,17 +3306,17 @@ def main():
             text=[f"{x:.0%}" for x in top_10_chart['incorrect_rate']],
             color='incorrect_rate',
             color_continuous_scale='Reds',
-            range_color=[0, 1]  # 컬러바 범위를 0~1로 고정
+            range_color=[0, 1]
         )
-        fig.update_traces(textposition='outside')
+        fig.update_traces(textposition='outside', marker_line_color='black', marker_line_width=1.5)
         fig.update_layout(
             height=500,
             showlegend=False,
-            yaxis_title=t['wrong_rate'],
-            xaxis_title=t['problem_id'],
-            yaxis=dict(range=[0, 1])  # y축 범위를 0~1로 고정
+            yaxis_title='오답률',
+            xaxis_title='문제 번호',
+            yaxis=dict(range=[0, 1])
         )
-        fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
+        fig.update_xaxes(tickangle=45)
         st.plotly_chart(fig, use_container_width=True)
     
     # 탭 8: 난이도 분석

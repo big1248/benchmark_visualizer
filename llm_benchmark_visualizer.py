@@ -2468,7 +2468,7 @@ def main():
         st.header(f"🔬 {'심층 오답 분석' if lang == 'ko' else 'Deep Incorrect Analysis'}")
         
         st.markdown("""
-        > **논문 기반 심층 분석**: 이 탭은 DisasterQA논문의 "지식 격차/Knowledge Gap(Common Mistakes)" 분석 방법론을 적용합니다.
+        > **논문 기반 심층 분석**: 이 탭은 학술 논문의 "공통 오답 패턴(Common Wrong Answer)" 분석 방법론을 적용합니다.
         > 단순히 오답률이 높은 문제를 넘어, **모델들이 일관되게 같은 오답을 선택하는 패턴**을 식별하여 
         > LLM의 근본적인 지식 문제를 파악합니다.
         """)
@@ -2560,7 +2560,7 @@ def main():
         with col2:
             all_wrong = len(problem_analysis[problem_analysis['correct_count'] == 0])
             st.metric(
-                "완전 지식 격차" if lang == 'ko' else "Complete Knowledge Gaps",
+                "완전 공통 오답" if lang == 'ko' else "Complete Common Wrong Answers",
                 f"{all_wrong}",
                 help="모든 모델이 틀린 문제"
             )
@@ -2568,7 +2568,7 @@ def main():
         with col3:
             most_wrong = len(problem_analysis[problem_analysis['incorrect_rate'] >= 0.5])
             st.metric(
-                "주요 지식 격차" if lang == 'ko' else "Major Knowledge Gaps",
+                "주요 공통 오답" if lang == 'ko' else "Major Common Wrong Answers",
                 f"{most_wrong}",
                 help="50% 이상의 모델이 틀린 문제"
             )
@@ -2672,6 +2672,7 @@ def main():
         
         # 일관된 오답 패턴 계산
         consistent_wrong_patterns = []
+        extraction_failures = []  # 답안 추출 실패 추적
         
         for idx, row in problem_analysis.iterrows():
             # ⭐ 핵심 변경: 오답률 50% 이상 & 최소 2개 이상 오답인 문제만 분석
@@ -2679,12 +2680,38 @@ def main():
                 selected = row['selected_answers']
                 correct = row['CorrectAnswer']
                 
+                # 전체 평가 모델 수
+                total_models = row['total_count']
+                
+                # 답안 추출 통계
+                valid_answers = 0
+                nan_count = 0
+                empty_count = 0
+                
                 # 오답을 선택한 모델들의 답변 수집 (문자열로 변환하되, nan 제외)
                 wrong_answers = []
                 for model, answer in selected.items():
-                    if pd.notna(answer) and str(answer).strip() != '' and str(answer) != str(correct):
+                    if pd.isna(answer):
+                        nan_count += 1
+                    elif str(answer).strip() == '':
+                        empty_count += 1
+                    elif str(answer) != str(correct):
                         # 정답이 아니면 오답
                         wrong_answers.append(str(answer).strip())
+                        valid_answers += 1
+                    else:
+                        valid_answers += 1
+                
+                # 🔍 추출 실패 기록
+                if nan_count > 0 or empty_count > 0:
+                    extraction_failures.append({
+                        'problem_id': row['problem_id'],
+                        'total_models': total_models,
+                        'valid_answers': valid_answers,
+                        'nan_count': nan_count,
+                        'empty_count': empty_count,
+                        'extraction_rate': (valid_answers / total_models * 100) if total_models > 0 else 0
+                    })
                 
                 if wrong_answers:
                     from collections import Counter
@@ -2693,9 +2720,18 @@ def main():
                     
                     consistency_ratio = count / len(wrong_answers)
                     
+                    # 🔍 검증: 오답 수가 incorrect_count와 일치하는지 확인
+                    if len(wrong_answers) != row['incorrect_count']:
+                        # 경고: 데이터 불일치
+                        st.sidebar.warning(f"⚠️ 문제 {row['problem_id']}: 오답 수 불일치 (계산: {len(wrong_answers)}, 기록: {row['incorrect_count']})")
+                    
                     if consistency_ratio >= 0.5:
                         models_selected_this = [m for m, a in selected.items() 
                                               if pd.notna(a) and str(a).strip() == most_common_wrong]
+                        
+                        # 🔍 검증 2: 일관성 100%인 경우, 오답 수 = 전체 오답이어야 함
+                        if consistency_ratio == 1.0 and count != len(wrong_answers):
+                            st.sidebar.error(f"❌ 문제 {row['problem_id']}: 일관성 계산 오류!")
                         
                         consistent_wrong_patterns.append({
                             'problem_id': row['problem_id'],
@@ -2708,8 +2744,55 @@ def main():
                             'total_wrong': len(wrong_answers),
                             'consistency_ratio': consistency_ratio,
                             'models_with_this_wrong': ', '.join(models_selected_this),
-                            'incorrect_rate': row['incorrect_rate']
+                            'incorrect_rate': row['incorrect_rate'],
+                            'total_models': total_models,
+                            'valid_answers': valid_answers,
+                            'nan_count': nan_count,
+                            'empty_count': empty_count,
+                            'incorrect_count_from_analysis': row['incorrect_count']
                         })
+        
+        # 🚨 답안 추출 실패 통계 표시
+        if extraction_failures:
+            with st.expander(f"⚠️ 답안 추출 실패 통계 ({len(extraction_failures)}개 문제)"):
+                failure_df = pd.DataFrame(extraction_failures)
+                failure_df = failure_df.sort_values('nan_count', ascending=False)
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    total_nan = failure_df['nan_count'].sum()
+                    st.metric("총 nan 개수", f"{total_nan}개")
+                with col2:
+                    total_empty = failure_df['empty_count'].sum()
+                    st.metric("총 빈 답안 개수", f"{total_empty}개")
+                with col3:
+                    avg_extraction = failure_df['extraction_rate'].mean()
+                    st.metric("평균 추출 성공률", f"{avg_extraction:.1f}%")
+                
+                st.warning("""
+                💡 **답안 추출 실패 원인**:
+                - **nan**: 모델이 답을 추출하지 못함 (파싱 오류, 형식 불일치)
+                - **빈 답안**: 모델이 빈 문자열을 반환
+                
+                **영향**:
+                - 오답률 계산 시 분모가 감소
+                - 일관성 계산에서 제외됨
+                
+                **조치**:
+                - 벤치마크 로그 확인
+                - 답안 추출 로직 개선
+                - 해당 문제 재실행 고려
+                """)
+                
+                st.dataframe(
+                    failure_df.head(20).style.format({
+                        'extraction_rate': '{:.1f}%'
+                    }).background_gradient(
+                        subset=['nan_count'],
+                        cmap='Reds'
+                    ),
+                    use_container_width=True
+                )
         
         if consistent_wrong_patterns:
             consistent_df = pd.DataFrame(consistent_wrong_patterns)
@@ -2792,6 +2875,10 @@ def main():
                                                    ' (' + display_perfect['wrong_answer_count'].astype(str) + 
                                                    '/' + display_perfect['total_wrong'].astype(str) + ')')
                     
+                    # 🔍 검증: 오답률 계산 확인
+                    display_perfect['검증_오답률'] = (display_perfect['total_wrong'] / display_perfect['total_models'] * 100).round(1)
+                    display_perfect['검증_일치'] = (display_perfect['오답률_pct'] - display_perfect['검증_오답률']).abs() < 1.0
+                    
                     display_df = pd.DataFrame({
                         '문제 번호' if lang == 'ko' else 'Problem ID': display_perfect['problem_id'],
                         '과목' if lang == 'ko' else 'Subject': display_perfect['Subject'],
@@ -2799,8 +2886,22 @@ def main():
                         '정답' if lang == 'ko' else 'Correct': display_perfect['correct_answer'],
                         '공통 오답 (횟수/전체)': display_perfect['오답_정보'],
                         '일관성 (%)': display_perfect['일관성_pct'],
+                        '평가 모델수': display_perfect['total_models'],
                         '해당 오답 선택 모델': display_perfect['models_with_this_wrong']
                     })
+                    
+                    # 🚨 검증 실패 경고
+                    if not display_perfect['검증_일치'].all():
+                        st.warning(f"""
+                        ⚠️ **데이터 불일치 경고**: 일부 문제에서 오답률과 실제 오답 수가 맞지 않습니다.
+                        
+                        가능한 원인:
+                        - 일부 모델의 답안 추출 실패 (nan 값)
+                        - 특정 모델이 해당 문제를 평가하지 않음
+                        - 데이터 필터링으로 인한 모델 수 변화
+                        
+                        💡 "평가 모델수" 컬럼을 확인하여 실제 평가된 모델 수를 확인하세요.
+                        """)
                     
                     st.dataframe(
                         display_df.style.background_gradient(
@@ -2810,7 +2911,8 @@ def main():
                             vmax=100
                         ).format({
                             '일관성 (%)': '{:.1f}%',
-                            '오답률 (%)': '{:.1f}%'
+                            '오답률 (%)': '{:.1f}%',
+                            '평가 모델수': '{:.0f}'
                         }),
                         use_container_width=True,
                         height=500
@@ -2862,6 +2964,7 @@ def main():
                         '정답' if lang == 'ko' else 'Correct': display_high['correct_answer'],
                         '공통 오답 (횟수/전체)': display_high['오답_정보'],
                         '일관성 (%)': display_high['일관성_pct'],
+                        '평가 모델수': display_high['total_models'],
                         '해당 오답 선택 모델': display_high['models_with_this_wrong']
                     })
                     
@@ -2873,7 +2976,8 @@ def main():
                             vmax=100
                         ).format({
                             '일관성 (%)': '{:.1f}%',
-                            '오답률 (%)': '{:.1f}%'
+                            '오답률 (%)': '{:.1f}%',
+                            '평가 모델수': '{:.0f}'
                         }),
                         use_container_width=True,
                         height=500
@@ -2908,10 +3012,10 @@ def main():
         else:
             st.warning("일관된 오답 선택 패턴이 발견되지 않았습니다. (오답률 50% 이상 & 일관성 50% 이상 문제 없음)")
         
-        # 섹션 3: 프롬프팅 방식별 지식 격차 비교
+        # 섹션 3: 프롬프팅 방식별 공통 오답 비교
         # ========================================
         st.markdown("---")
-        st.subheader("📋 " + ("프롬프팅 방식별 지식 격차 분석" if lang == 'ko' else "Knowledge Gap by Prompting"))
+        st.subheader("📋 " + ("프롬프팅 방식별 공통 오답 분석" if lang == 'ko' else "Common Wrong Answer by Prompting"))
         
         if '프롬프팅' in filtered_df.columns and filtered_df['프롬프팅'].nunique() > 1:
             st.info("""
@@ -2944,7 +3048,7 @@ def main():
                     prompt_comp_df,
                     x='프롬프팅',
                     y='완전_지식격차',
-                    title='프롬프팅 방식별 완전 지식 격차',
+                    title='프롬프팅 방식별 완전 공통 오답',
                     text='완전_지식격차',
                     color='완전_지식격차',
                     color_continuous_scale='Reds'
@@ -2985,7 +3089,7 @@ def main():
         
         st.info("""
         💡 **분석 목적**: 어떤 모델들이 유사한 실수를 하는지 파악
-        높은 일치도 = 유사한 지식 격차 공유
+        높은 일치도 = 유사한 공통 오답 공유
         """)
         
         models = filtered_df['모델'].unique().tolist()
@@ -3060,10 +3164,10 @@ def main():
             st.warning("2개 이상의 모델이 필요합니다.")
         
         # ========================================
-        # 섹션 5: 지식 격차 영역 매핑
+        # 섹션 5: 공통 오답 영역 매핑
         # ========================================
         st.markdown("---")
-        st.subheader("🗺️ " + ("지식 격차 영역 매핑" if lang == 'ko' else "Knowledge Gap Domain Mapping"))
+        st.subheader("🗺️ " + ("공통 오답 영역 매핑" if lang == 'ko' else "Common Wrong Answer Domain Mapping"))
         
         all_wrong = problem_analysis[problem_analysis['correct_count'] == 0]
         
@@ -3082,14 +3186,14 @@ def main():
                         subject_gaps.sort_values('Gap_Ratio', ascending=False),
                         x='Subject',
                         y='Gap_Ratio',
-                        title='과목별 지식 격차 비율',
+                        title='과목별 공통 오답 비율',
                         text='Gap_Ratio',
                         color='Gap_Ratio',
                         color_continuous_scale='Reds',
                         hover_data=['Count', 'Total']
                     )
                     fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside', marker_line_color='black', marker_line_width=1.5)
-                    fig.update_layout(height=400, yaxis_title='지식 격차 비율 (%)')
+                    fig.update_layout(height=400, yaxis_title='공통 오답 비율 (%)')
                     fig.update_xaxes(tickangle=45)
                     st.plotly_chart(fig, use_container_width=True)
             
@@ -3107,7 +3211,7 @@ def main():
                             year_gaps,
                             x='Year_Int',
                             y='Count',
-                            title='연도별 지식 격차 문제 수',
+                            title='연도별 공통 오답 문제 수',
                             markers=True,
                             text='Count'
                         )
@@ -3146,16 +3250,16 @@ def main():
         )
         
         # ========================================
-        # 섹션 7: 모든 모델이 틀린 문제 (완전 지식 격차)
+        # 섹션 7: 모든 모델이 틀린 문제 (완전 공통 오답)
         # ========================================
         st.markdown("---")
-        st.subheader("🚨 " + ("모든 모델이 틀린 문제 (완전 지식 격차)" if lang == 'ko' else "All Models Incorrect (Complete Knowledge Gap)"))
+        st.subheader("🚨 " + ("모든 모델이 틀린 문제 (완전 공통 오답)" if lang == 'ko' else "All Models Incorrect (Complete Common Wrong Answer)"))
         
         all_wrong = problem_analysis[problem_analysis['correct_count'] == 0]
         
         if len(all_wrong) > 0:
             st.error(f"""
-            ⚠️ **심각한 지식 격차 발견: {len(all_wrong)}개 문제**
+            ⚠️ **심각한 공통 오답 발견: {len(all_wrong)}개 문제**
             
             이 문제들은 **모든 평가 모델이 틀렸습니다**. 현재 LLM들이 공통적으로 
             해당 지식 영역을 제대로 이해하지 못하고 있음을 의미합니다.
@@ -3171,7 +3275,7 @@ def main():
             
             st.dataframe(display_all_wrong, use_container_width=True, height=400)
             
-            if st.checkbox('문제 내용 보기 (완전 지식 격차)' if lang == 'ko' else 'Show Details (Complete Gap)', key='all_wrong_details'):
+            if st.checkbox('문제 내용 보기 (완전 공통 오답)' if lang == 'ko' else 'Show Details (Complete Gap)', key='all_wrong_details'):
                 st.info(f"총 {len(all_wrong)}개 문제의 상세 내용")
                 for idx, row in all_wrong.head(20).iterrows():
                     with st.expander(f"🚨 {row['problem_id']}"):
@@ -3210,7 +3314,7 @@ def main():
         
         if len(most_wrong) > 0:
             st.warning(f"""
-            ⚠️ **주요 지식 격차: {len(most_wrong)}개 문제**
+            ⚠️ **주요 공통 오답: {len(most_wrong)}개 문제**
             
             이 문제들은 **50% 이상의 모델이 틀렸습니다**. 해당 지식 영역이 
             많은 LLM에게 어려운 영역임을 의미합니다.
@@ -3285,14 +3389,14 @@ def main():
             st.subheader("⚖️ " + ("법령/비법령 오답 분석" if lang == 'ko' else "Law/Non-Law Incorrect Analysis"))
             
             st.info("""
-            💡 **법령 지식 격차 분석**: 법령 문제와 비법령 문제에서 모델들의 오답 패턴이 
+            💡 **법령 공통 오답 분석**: 법령 문제와 비법령 문제에서 모델들의 오답 패턴이 
             어떻게 다른지 분석하여 법률 지식의 격차를 파악합니다.
             """)
             
             col1, col2 = st.columns(2)
             
             with col1:
-                # 법령/비법령별 완전 지식 격차 비율
+                # 법령/비법령별 완전 공통 오답 비율
                 law_all_wrong = problem_analysis[problem_analysis['correct_count'] == 0]
                 law_gap_by_type = law_all_wrong['law_status'].value_counts()
                 
@@ -3313,14 +3417,14 @@ def main():
                     law_gap_data,
                     x='구분',
                     y='비율',
-                    title='법령/비법령 완전 지식 격차 비율',
+                    title='법령/비법령 완전 공통 오답 비율',
                     text='비율',
                     color='비율',
                     color_continuous_scale='Reds',
                     hover_data=['완전_지식격차', '전체문제']
                 )
                 fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside', marker_line_color='black', marker_line_width=1.5)
-                fig.update_layout(height=400, yaxis_title='지식 격차 비율 (%)')
+                fig.update_layout(height=400, yaxis_title='공통 오답 비율 (%)')
                 st.plotly_chart(fig, use_container_width=True)
             
             with col2:
@@ -3342,14 +3446,14 @@ def main():
                 fig.update_layout(height=400, yaxis_title='평균 오답률 (%)', yaxis=dict(range=[0, 100]))
                 st.plotly_chart(fig, use_container_width=True)
             
-            # 법령 문제 중 완전 지식 격차
-            st.markdown("#### 📜 " + ("법령 문제 중 완전 지식 격차" if lang == 'ko' else "Law Problems - Complete Gap"))
+            # 법령 문제 중 완전 공통 오답
+            st.markdown("#### 📜 " + ("법령 문제 중 완전 공통 오답" if lang == 'ko' else "Law Problems - Complete Gap"))
             
             law_complete_gap = law_all_wrong[law_all_wrong['law_status'] == 'O']
             
             if len(law_complete_gap) > 0:
                 st.error(f"""
-                ⚠️ **법령 지식 격차: {len(law_complete_gap)}개 문제**
+                ⚠️ **법령 공통 오답: {len(law_complete_gap)}개 문제**
                 
                 모든 모델이 틀린 법령 문제입니다. 법률 용어, 규정 해석, 법적 판단에 대한 
                 근본적인 지식 부족을 의미합니다.
@@ -3364,7 +3468,7 @@ def main():
                 
                 st.dataframe(display_law_gap, use_container_width=True)
                 
-                if st.checkbox('법령 지식 격차 문제 상세 보기', key='law_gap_details'):
+                if st.checkbox('법령 공통 오답 문제 상세 보기', key='law_gap_details'):
                     for idx, row in law_complete_gap.head(10).iterrows():
                         with st.expander(f"📜 {row['problem_id']}"):
                             q_detail = filtered_df[filtered_df['Question'] == row['Question']].iloc[0]
@@ -3392,14 +3496,14 @@ def main():
             else:
                 st.success("✅ 모든 모델이 틀린 법령 문제가 없습니다!")
             
-            # 비법령 문제 중 완전 지식 격차
-            st.markdown("#### 📘 " + ("비법령 문제 중 완전 지식 격차" if lang == 'ko' else "Non-Law Problems - Complete Gap"))
+            # 비법령 문제 중 완전 공통 오답
+            st.markdown("#### 📘 " + ("비법령 문제 중 완전 공통 오답" if lang == 'ko' else "Non-Law Problems - Complete Gap"))
             
             non_law_complete_gap = law_all_wrong[law_all_wrong['law_status'] != 'O']
             
             if len(non_law_complete_gap) > 0:
                 st.warning(f"""
-                ℹ️ **비법령 지식 격차: {len(non_law_complete_gap)}개 문제**
+                ℹ️ **비법령 공통 오답: {len(non_law_complete_gap)}개 문제**
                 
                 모든 모델이 틀린 비법령 문제입니다. 기술적 지식, 실무 경험, 
                 전문 용어 이해 등에 대한 격차를 의미합니다.
@@ -3418,7 +3522,7 @@ def main():
             
             # 인사이트 및 권장 조치
             st.markdown("---")
-            st.markdown("#### 💡 " + ("법령/비법령 지식 격차 인사이트" if lang == 'ko' else "Law/Non-Law Gap Insights"))
+            st.markdown("#### 💡 " + ("법령/비법령 공통 오답 인사이트" if lang == 'ko' else "Law/Non-Law Gap Insights"))
             
             law_gap_count = len(law_complete_gap)
             non_law_gap_count = len(non_law_complete_gap)
@@ -3428,10 +3532,10 @@ def main():
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                st.metric("법령 지식 격차 비율", f"{law_gap_ratio:.1f}%", f"{law_gap_count}/{total_law}")
+                st.metric("법령 공통 오답 비율", f"{law_gap_ratio:.1f}%", f"{law_gap_count}/{total_law}")
             
             with col2:
-                st.metric("비법령 지식 격차 비율", f"{non_law_gap_ratio:.1f}%", f"{non_law_gap_count}/{total_non_law}")
+                st.metric("비법령 공통 오답 비율", f"{non_law_gap_ratio:.1f}%", f"{non_law_gap_count}/{total_non_law}")
             
             with col3:
                 if law_gap_ratio > non_law_gap_ratio:
@@ -3443,7 +3547,7 @@ def main():
                 st.error(f"""
                 🚨 **법령 지식이 특히 취약합니다!**
                 
-                법령 문제의 지식 격차 비율({law_gap_ratio:.1f}%)이 비법령({non_law_gap_ratio:.1f}%)보다 
+                법령 문제의 공통 오답 비율({law_gap_ratio:.1f}%)이 비법령({non_law_gap_ratio:.1f}%)보다 
                 {law_gap_ratio / non_law_gap_ratio:.1f}배 높습니다.
                 
                 **권장 조치**:
@@ -3455,7 +3559,7 @@ def main():
                 st.warning(f"""
                 ⚠️ **기술/실무 지식이 상대적으로 취약합니다!**
                 
-                비법령 문제의 지식 격차 비율({non_law_gap_ratio:.1f}%)이 법령({law_gap_ratio:.1f}%)보다 
+                비법령 문제의 공통 오답 비율({non_law_gap_ratio:.1f}%)이 법령({law_gap_ratio:.1f}%)보다 
                 {non_law_gap_ratio / law_gap_ratio:.1f}배 높습니다.
                 
                 **권장 조치**:
@@ -3465,10 +3569,10 @@ def main():
                 """)
             else:
                 st.success(f"""
-                ✅ **법령과 비법령 지식 격차가 균형적입니다.**
+                ✅ **법령과 비법령 공통 오답가 균형적입니다.**
                 
                 법령({law_gap_ratio:.1f}%)과 비법령({non_law_gap_ratio:.1f}%) 문제의 
-                지식 격차 비율이 비슷한 수준입니다.
+                공통 오답 비율이 비슷한 수준입니다.
                 """)
         
         # ========================================

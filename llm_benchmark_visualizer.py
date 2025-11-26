@@ -2990,6 +2990,9 @@ def main():
                                                    ' (' + display_perfect['wrong_answer_count'].astype(str) + 
                                                    '/' + display_perfect['total_wrong'].astype(str) + ')')
                     
+                    # 🔥 오답률 높은 순으로 정렬
+                    display_perfect = display_perfect.sort_values('incorrect_rate', ascending=False)
+                    
                     # 🔍 검증: 오답률 계산 확인
                     display_perfect['검증_오답률'] = (display_perfect['total_wrong'] / display_perfect['total_models'] * 100).round(1)
                     display_perfect['검증_일치'] = (display_perfect['오답률_pct'] - display_perfect['검증_오답률']).abs() < 1.0
@@ -3034,7 +3037,8 @@ def main():
                     )
                     
                     if st.checkbox('📋 ' + ('100% 일관성 문제 상세 보기' if lang == 'ko' else 'Show Details'), key='perfect_details'):
-                        for idx, row in display_perfect.head(20).iterrows():
+                        st.info(f"💡 총 {len(display_perfect)}개 문제의 상세 내용을 표시합니다. (오답률 높은 순)")
+                        for idx, row in display_perfect.iterrows():  # 🔥 head(20) 제거 - 전체 표시
                             with st.expander(f"🔍 {row['problem_id']} - 일관성 100% (오답률 {row['incorrect_rate']*100:.1f}%)"):
                                 q_detail = filtered_df[filtered_df['Question'] == row['Question']].iloc[0]
                                 
@@ -3072,6 +3076,9 @@ def main():
                                                ' (' + display_high['wrong_answer_count'].astype(str) + 
                                                '/' + display_high['total_wrong'].astype(str) + ')')
                     
+                    # 🔥 오답률 높은 순으로 정렬
+                    display_high = display_high.sort_values('incorrect_rate', ascending=False)
+                    
                     display_df = pd.DataFrame({
                         '문제 번호' if lang == 'ko' else 'Problem ID': display_high['problem_id'],
                         '과목' if lang == 'ko' else 'Subject': display_high['Subject'],
@@ -3099,7 +3106,8 @@ def main():
                     )
                     
                     if st.checkbox('📋 ' + ('50-99% 일관성 문제 상세 보기' if lang == 'ko' else 'Show Details'), key='high_details'):
-                        for idx, row in display_high.head(30).iterrows():
+                        st.info(f"💡 총 {len(display_high)}개 문제의 상세 내용을 표시합니다. (오답률 높은 순)")
+                        for idx, row in display_high.iterrows():  # 🔥 head(30) 제거 - 전체 표시
                             with st.expander(f"🔍 {row['problem_id']} - 일관성 {row['consistency_ratio']*100:.1f}% (오답률 {row['incorrect_rate']*100:.1f}%)"):
                                 q_detail = filtered_df[filtered_df['Question'] == row['Question']].iloc[0]
                                 

@@ -2474,12 +2474,39 @@ def main():
         """)
         
         # 기본 오답 분석 데이터 준비
-        problem_analysis = filtered_df.groupby('Question').agg({
+        # 문제별 오답 통계 계산
+        # 🔧 수정: 고유 식별자 생성하여 중복 방지
+        # Question만으로는 중복 가능 (여러 테스트에서 같은 문제 번호)
+        # → Test Name + Year + Session + Question으로 고유 식별자 생성
+        
+        # 고유 식별자 생성
+        if 'Test Name' in filtered_df.columns:
+            filtered_df['unique_question_id'] = (
+                filtered_df['Test Name'].astype(str) + '_' +
+                filtered_df['Year'].astype(str) + '_' +
+                filtered_df['Session'].astype(str) + '_' +
+                filtered_df['Question'].astype(str)
+            )
+        else:
+            filtered_df['unique_question_id'] = filtered_df['Question'].astype(str)
+        
+        # 고유 식별자로 그룹화
+        problem_analysis = filtered_df.groupby('unique_question_id').agg({
             '정답여부': ['sum', 'count', 'mean']
         }).reset_index()
-        problem_analysis.columns = ['Question', 'correct_count', 'total_count', 'correct_rate']
+        problem_analysis.columns = ['unique_question_id', 'correct_count', 'total_count', 'correct_rate']
         problem_analysis['incorrect_rate'] = 1 - problem_analysis['correct_rate']
         problem_analysis['incorrect_count'] = problem_analysis['total_count'] - problem_analysis['correct_count']
+        
+        # Question 컬럼도 추가 (표시용)
+        questions = []
+        for uid in problem_analysis['unique_question_id']:
+            matching = filtered_df[filtered_df['unique_question_id'] == uid]
+            if len(matching) > 0:
+                questions.append(matching.iloc[0]['Question'])
+            else:
+                questions.append(uid)
+        problem_analysis['Question'] = questions
         
         # 문제 식별자 및 메타데이터 추가
         problem_ids = []
@@ -2488,8 +2515,8 @@ def main():
         correct_answers = []
         law_statuses = []
         
-        for question in problem_analysis['Question']:
-            matching_rows = filtered_df[filtered_df['Question'] == question]
+        for uid in problem_analysis['unique_question_id']:
+            matching_rows = filtered_df[filtered_df['unique_question_id'] == uid]
             if len(matching_rows) > 0:
                 row = matching_rows.iloc[0]
                 problem_id = create_problem_identifier(row, lang)
@@ -2516,8 +2543,8 @@ def main():
         incorrect_models_list = []
         selected_answers_dict = []
         
-        for question in problem_analysis['Question']:
-            q_df = filtered_df[filtered_df['Question'] == question]
+        for uid in problem_analysis['unique_question_id']:
+            q_df = filtered_df[filtered_df['unique_question_id'] == uid]
             correct_models = q_df[q_df['정답여부'] == True]['모델'].unique().tolist()
             incorrect_models = q_df[q_df['정답여부'] == False]['모델'].unique().tolist()
             

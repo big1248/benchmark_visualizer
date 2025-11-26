@@ -2578,10 +2578,23 @@ def main():
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            total_problems = len(problem_analysis)
+            # 🔧 수정: testsets 기준으로 계산 (전체 요약과 동일)
+            total_problems_testset = 0
+            if selected_tests:
+                for test_name in selected_tests:
+                    if test_name in testsets:
+                        total_problems_testset += len(testsets[test_name])
+            
+            # 백업: problem_analysis 기준
+            total_problems_analysis = len(problem_analysis)
+            
+            # 우선순위: testsets > analysis
+            display_total = total_problems_testset if total_problems_testset > 0 else total_problems_analysis
+            
             st.metric(
                 "분석 문제 수" if lang == 'ko' else "Total Problems",
-                f"{total_problems:,}"
+                f"{display_total:,}",
+                help="테스트셋 기준 총 문제 수"
             )
         
         with col2:

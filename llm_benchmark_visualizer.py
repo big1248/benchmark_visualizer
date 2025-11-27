@@ -5553,24 +5553,61 @@ def main():
         
         # Figure 4: 출시 시기-성능 산점도
         if table3 is not None and len(table3) > 0:
-            st.subheader("📅 " + ("Figure 4: 출시 시기-성능 성능 추이" if lang == 'ko' else "Figure 4: Release Date vs Performance"))
+            st.subheader("📅 " + ("Figure 4: 출시 시기-성능 추이" if lang == 'ko' else "Figure 4: Release Date vs Performance"))
             
-            # 날짜를 숫자로 변환하여 추세선 그리기
-            fig = px.scatter(
-                table3_copy,
-                x='date_numeric',
-                y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
-                text='모델명' if lang == 'ko' else 'Model',
-                title='모델 출시 시기와 성능 관계' if lang == 'ko' else 'Model Release Date vs Performance',
-                trendline='ols',
-                labels={'date_numeric': '출시 시기' if lang == 'ko' else 'Release Date'}
-            )
+            # statsmodels 패키지 확인
+            try:
+                import statsmodels.api as sm
+                use_trendline = True
+            except ImportError:
+                use_trendline = False
+            
+            # 날짜를 숫자로 변환
+            if use_trendline:
+                # 추세선 그리기
+                fig = px.scatter(
+                    table3_copy,
+                    x='date_numeric',
+                    y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
+                    text='모델명' if lang == 'ko' else 'Model',
+                    title='모델 출시 시기와 성능 관계 (추세선 포함)' if lang == 'ko' else 'Model Release Date vs Performance (with Trendline)',
+                    trendline='ols',
+                    labels={'date_numeric': '출시 시기' if lang == 'ko' else 'Release Date'}
+                )
+            else:
+                # 추세선 없이 그리기
+                fig = px.scatter(
+                    table3_copy,
+                    x='date_numeric',
+                    y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
+                    text='모델명' if lang == 'ko' else 'Model',
+                    title='모델 출시 시기와 성능 관계' if lang == 'ko' else 'Model Release Date vs Performance',
+                    labels={'date_numeric': '출시 시기' if lang == 'ko' else 'Release Date'}
+                )
+                
+                # 수동으로 간단한 추세선 추가
+                import numpy as np
+                x_numeric = table3_copy['date_numeric'].values
+                y_values = table3_copy['평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)'].values
+                
+                # 선형 회귀 계산
+                z = np.polyfit(x_numeric, y_values, 1)
+                p = np.poly1d(z)
+                
+                # 추세선 추가
+                fig.add_scatter(
+                    x=x_numeric,
+                    y=p(x_numeric),
+                    mode='lines',
+                    name='추세선' if lang == 'ko' else 'Trend',
+                    line=dict(color='red', dash='dash')
+                )
             
             # X축 레이블을 원래 날짜 형식으로 변경
             tickvals = sorted(table3_copy['date_numeric'].unique())
             ticktext = [f"{str(val)[:4]}-{str(val)[4:]}" for val in tickvals]
             
-            fig.update_traces(textposition='top center', marker=dict(size=10))
+            fig.update_traces(textposition='top center', marker=dict(size=10), selector=dict(mode='markers'))
             fig.update_layout(
                 height=500,
                 xaxis=dict(

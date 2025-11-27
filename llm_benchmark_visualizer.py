@@ -5555,47 +5555,33 @@ def main():
         if table3 is not None and len(table3) > 0:
             st.subheader("📅 " + ("Figure 4: 출시 시기-성능 추이" if lang == 'ko' else "Figure 4: Release Date vs Performance"))
             
-            # 추세선 그리기 시도 (statsmodels 필요)
-            try:
-                fig = px.scatter(
-                    table3_copy,
-                    x='date_numeric',
-                    y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
-                    text='모델명' if lang == 'ko' else 'Model',
-                    title='모델 출시 시기와 성능 관계 (추세선 포함)' if lang == 'ko' else 'Model Release Date vs Performance (with Trendline)',
-                    trendline='ols',
-                    labels={'date_numeric': '출시 시기' if lang == 'ko' else 'Release Date'}
-                )
-                use_trendline = True
-            except (ImportError, ModuleNotFoundError):
-                # statsmodels가 없으면 추세선 없이 그리기
-                fig = px.scatter(
-                    table3_copy,
-                    x='date_numeric',
-                    y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
-                    text='모델명' if lang == 'ko' else 'Model',
-                    title='모델 출시 시기와 성능 관계' if lang == 'ko' else 'Model Release Date vs Performance',
-                    labels={'date_numeric': '출시 시기' if lang == 'ko' else 'Release Date'}
-                )
-                
-                # 수동으로 간단한 추세선 추가
-                import numpy as np
-                x_numeric = table3_copy['date_numeric'].values
-                y_values = table3_copy['평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)'].values
-                
-                # 선형 회귀 계산
-                z = np.polyfit(x_numeric, y_values, 1)
-                p = np.poly1d(z)
-                
-                # 추세선 추가
-                fig.add_scatter(
-                    x=x_numeric,
-                    y=p(x_numeric),
-                    mode='lines',
-                    name='추세선' if lang == 'ko' else 'Trend',
-                    line=dict(color='red', dash='dash')
-                )
-                use_trendline = False
+            # 추세선 없이 산점도만 표시 (statsmodels 의존성 제거)
+            fig = px.scatter(
+                table3_copy,
+                x='date_numeric',
+                y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
+                text='모델명' if lang == 'ko' else 'Model',
+                title='모델 출시 시기와 성능 관계' if lang == 'ko' else 'Model Release Date vs Performance',
+                labels={'date_numeric': '출시 시기' if lang == 'ko' else 'Release Date'}
+            )
+            
+            # numpy로 수동 추세선 추가
+            import numpy as np
+            x_numeric = table3_copy['date_numeric'].values
+            y_values = table3_copy['평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)'].values
+            
+            # 선형 회귀 계산
+            z = np.polyfit(x_numeric, y_values, 1)
+            p = np.poly1d(z)
+            
+            # 추세선 추가
+            fig.add_scatter(
+                x=sorted(x_numeric),
+                y=p(sorted(x_numeric)),
+                mode='lines',
+                name='추세선' if lang == 'ko' else 'Trend',
+                line=dict(color='red', dash='dash', width=2)
+            )
             
             # X축 레이블을 원래 날짜 형식으로 변경
             tickvals = sorted(table3_copy['date_numeric'].unique())

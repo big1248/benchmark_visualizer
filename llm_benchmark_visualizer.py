@@ -5555,16 +5555,8 @@ def main():
         if table3 is not None and len(table3) > 0:
             st.subheader("📅 " + ("Figure 4: 출시 시기-성능 추이" if lang == 'ko' else "Figure 4: Release Date vs Performance"))
             
-            # statsmodels 패키지 확인
+            # 추세선 그리기 시도 (statsmodels 필요)
             try:
-                import statsmodels.api as sm
-                use_trendline = True
-            except ImportError:
-                use_trendline = False
-            
-            # 날짜를 숫자로 변환
-            if use_trendline:
-                # 추세선 그리기
                 fig = px.scatter(
                     table3_copy,
                     x='date_numeric',
@@ -5574,8 +5566,9 @@ def main():
                     trendline='ols',
                     labels={'date_numeric': '출시 시기' if lang == 'ko' else 'Release Date'}
                 )
-            else:
-                # 추세선 없이 그리기
+                use_trendline = True
+            except (ImportError, ModuleNotFoundError):
+                # statsmodels가 없으면 추세선 없이 그리기
                 fig = px.scatter(
                     table3_copy,
                     x='date_numeric',
@@ -5602,6 +5595,7 @@ def main():
                     name='추세선' if lang == 'ko' else 'Trend',
                     line=dict(color='red', dash='dash')
                 )
+                use_trendline = False
             
             # X축 레이블을 원래 날짜 형식으로 변경
             tickvals = sorted(table3_copy['date_numeric'].unique())

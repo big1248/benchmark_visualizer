@@ -8,6 +8,7 @@ import glob
 from pathlib import Path
 import numpy as np
 from scipy import stats
+import io
 
 import streamlit as st
 import requests
@@ -517,6 +518,411 @@ def safe_sort(values):
         # 실패하면 모두 문자열로 변환하여 정렬
         return sorted(values, key=str)
 
+# ========== Excel/CSV 다운로드 헬퍼 함수 ==========
+
+def create_download_button(df, filename, button_text="📥 Excel로 다운로드"):
+    """데이터프레임을 Excel 파일로 다운로드하는 버튼 생성"""
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Data')
+    
+    st.download_button(
+        label=button_text,
+        data=buffer.getvalue(),
+        file_name=filename,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+def create_csv_download_button(df, filename, button_text="📄 CSV로 다운로드"):
+    """데이터프레임을 CSV 파일로 다운로드하는 버튼 생성"""
+    csv = df.to_csv(index=False).encode('utf-8-sig')  # BOM 추가로 한글 깨짐 방지
+    st.download_button(
+        label=button_text,
+        data=csv,
+        file_name=filename,
+        mime="text/csv"
+    )
+
+def create_copy_button(df, button_text="📋 클립보드로 복사"):
+    """데이터프레임을 클립보드로 복사하는 버튼 생성"""
+    # TSV 형식으로 변환 (Excel에 붙여넣기 최적화)
+    tsv_data = df.to_csv(index=False, sep='\t')
+    
+    # 고유 ID 생성
+    import hashlib
+    button_id = hashlib.md5(tsv_data.encode()).hexdigest()[:8]
+    
+    # HTML + JavaScript로 클립보드 복사 구현
+    copy_button_html = f"""
+    <style>
+        .copy-button-{button_id} {{
+            background-color: #FF4B4B;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }}
+        .copy-button-{button_id}:hover {{
+            background-color: #FF6B6B;
+        }}
+        .copy-button-{button_id}:active {{
+            background-color: #FF2B2B;
+        }}
+        .copy-success-{button_id} {{
+            color: #00C851;
+            font-size: 12px;
+            margin-left: 10px;
+            display: none;
+        }}
+    </style>
+    
+    <button class="copy-button-{button_id}" onclick="copyToClipboard_{button_id}()">
+        {button_text}
+    </button>
+    <span class="copy-success-{button_id}" id="success-{button_id}">✓ 복사됨!</span>
+    
+    <script>
+    function copyToClipboard_{button_id}() {{
+        const data = `{tsv_data}`;
+        
+        navigator.clipboard.writeText(data).then(function() {{
+            // 성공 메시지 표시
+            const successMsg = document.getElementById('success-{button_id}');
+            successMsg.style.display = 'inline';
+            setTimeout(function() {{
+                successMsg.style.display = 'none';
+            }}, 2000);
+        }}, function(err) {{
+            // 실패 시 대체 방법 시도
+            const textArea = document.createElement("textarea");
+            textArea.value = data;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {{
+                document.execCommand('copy');
+                const successMsg = document.getElementById('success-{button_id}');
+                successMsg.style.display = 'inline';
+                setTimeout(function() {{
+                    successMsg.style.display = 'none';
+                }}, 2000);
+            }} catch (err) {{
+                alert('복사 실패: ' + err);
+            }}
+            document.body.removeChild(textArea);
+        }});
+    }}
+    </script>
+    """
+    
+    st.markdown(copy_button_html, unsafe_allow_html=True)
+
+def display_table_with_download(df, title, excel_filename, lang='ko'):
+    """표를 표시하고 다운로드/복사 버튼을 함께 제공"""
+    if title:
+        st.markdown(f"### {title}")
+    
+    col1, col2, col3 = st.columns([1, 1, 3])
+    with col1:
+        create_download_button(df, excel_filename)
+    with col2:
+        create_csv_download_button(df, excel_filename.replace('.xlsx', '.csv'))
+    with col3:
+        create_copy_button(df, "📋 " + ("클립보드로 복사" if lang == 'ko' else "Copy to Clipboard"))
+    
+    st.dataframe(df, use_container_width=True)
+    st.markdown("---")
+
+# ========== 모델 정보 추정 함수 ==========
+
+def calculate_model_release_date(model_name):
+    """모델명으로부터 대략적인 출시 시기 추정"""
+    release_dates = {
+        'GPT-4o': '2024-05',
+        'GPT-4o-Mini': '2024-07',
+        'GPT-4-Turbo': '2024-04',
+        'GPT-3.5-Turbo': '2023-03',
+        'Claude-Sonnet-4.5': '2024-10',
+        'Claude-Sonnet-4': '2024-06',
+        'Claude-3.5-Sonnet': '2024-06',
+        'Claude-3.5-Haiku': '2024-08',
+        'Claude-3-Opus': '2024-03',
+        'Claude-3-Sonnet': '2024-03',
+        'Claude-3-Haiku': '2024-03',
+        'Llama-3.3-70b': '2024-12',
+        'Llama-3.1-70b': '2024-07',
+        'Llama-3.1-8b': '2024-07',
+        'Qwen-2.5-72b': '2024-09',
+        'Qwen-2.5-32b': '2024-09',
+        'EXAONE-3.5-32b': '2024-08',
+        'EXAONE-3.0-7.8b': '2024-08',
+        'SOLAR-Pro': '2024-05',
+        'Gemma-2-27b': '2024-06',
+        'ko-gemma-2-9b': '2024-08',
+    }
+    
+    for key, date in release_dates.items():
+        if key.replace('-', '').replace('.', '').lower() in model_name.replace('-', '').replace('.', '').lower():
+            return date
+    
+    return '2024-01'  # 기본값
+
+def calculate_model_parameters(model_name):
+    """모델명으로부터 파라미터 수 추정 (억 단위)"""
+    if '70b' in model_name.lower() or '72b' in model_name.lower():
+        return 70
+    elif '32b' in model_name.lower():
+        return 32
+    elif '27b' in model_name.lower():
+        return 27
+    elif '9b' in model_name.lower():
+        return 9
+    elif '8b' in model_name.lower():
+        return 8
+    elif '7.8b' in model_name.lower() or '7b' in model_name.lower():
+        return 7.8
+    elif 'gpt-4' in model_name.lower():
+        return 175  # 추정치
+    elif 'claude' in model_name.lower():
+        return 100  # 추정치
+    else:
+        return 10  # 기본값
+
+# ========== 추가 분석 표 생성 함수 ==========
+
+def create_model_release_performance_table(filtered_df, lang='ko'):
+    """표 3: 모델 출시 시기와 SafetyQ&A 성능"""
+    models = filtered_df['모델'].unique()
+    
+    data = []
+    for model in models:
+        model_df = filtered_df[filtered_df['모델'] == model]
+        accuracy = (model_df['정답여부'].mean() * 100) if '정답여부' in model_df.columns else 0
+        release_date = calculate_model_release_date(model)
+        
+        data.append({
+            '출시 시기' if lang == 'ko' else 'Release Date': release_date,
+            '모델명' if lang == 'ko' else 'Model': model,
+            '평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)': round(accuracy, 2)
+        })
+    
+    df = pd.DataFrame(data).sort_values('출시 시기' if lang == 'ko' else 'Release Date', ascending=False)
+    return df
+
+def create_response_time_parameters_table(filtered_df, lang='ko'):
+    """표 4: 모델별 평균 응답 시간 및 정답률 (파라미터 수 포함)"""
+    time_col = None
+    for col in ['문제당평균시간(초)', '총소요시간(초)', 'question_duration']:
+        if col in filtered_df.columns:
+            time_col = col
+            break
+    
+    if time_col is None:
+        return None
+    
+    models = filtered_df['모델'].unique()
+    
+    data = []
+    for model in models:
+        model_df = filtered_df[filtered_df['모델'] == model]
+        
+        avg_time = model_df[time_col].mean() if time_col in model_df.columns else 0
+        accuracy = (model_df['정답여부'].mean() * 100) if '정답여부' in model_df.columns else 0
+        params = calculate_model_parameters(model)
+        
+        data.append({
+            '모델명' if lang == 'ko' else 'Model': model,
+            '파라미터 수 (B)' if lang == 'ko' else 'Parameters (B)': params,
+            '평균 응답시간 (초)' if lang == 'ko' else 'Avg Response Time (s)': round(avg_time, 2),
+            '정답률 (%)' if lang == 'ko' else 'Accuracy (%)': round(accuracy, 2)
+        })
+    
+    df = pd.DataFrame(data).sort_values('파라미터 수 (B)' if lang == 'ko' else 'Parameters (B)', ascending=False)
+    return df
+
+def create_year_correlation_table(filtered_df, lang='ko'):
+    """표 6: 출제 연도별 평균 정답률 및 문항 수 (상관계수 포함)"""
+    if 'Year' not in filtered_df.columns:
+        return None
+    
+    filtered_df['Year_Int'] = filtered_df['Year'].apply(safe_convert_to_int)
+    year_df = filtered_df[filtered_df['Year_Int'].notna()].copy()
+    
+    if len(year_df) == 0:
+        return None
+    
+    # 연도별 통계
+    year_stats = year_df.groupby('Year_Int').agg({
+        'Question': 'count',
+        '정답여부': ['mean', 'std']
+    }).reset_index()
+    
+    year_stats.columns = ['연도', '문항 수', '평균 정답률', '표준편차']
+    year_stats['평균 정답률'] = year_stats['평균 정답률'] * 100
+    year_stats['표준편차'] = year_stats['표준편차'] * 100
+    year_stats['연도'] = year_stats['연도'].astype(int)
+    
+    # 법령 문항 비율
+    if 'law' in year_df.columns:
+        law_ratio = year_df.groupby('Year_Int').apply(
+            lambda x: (x['law'] == 'O').sum() / len(x) * 100
+        ).reset_index()
+        law_ratio.columns = ['연도', '법령 문항 비율 (%)']
+        year_stats = year_stats.merge(law_ratio, on='연도', how='left')
+    
+    # 상관계수 계산
+    if len(year_stats) > 1:
+        correlation, p_value = stats.pearsonr(year_stats['연도'], year_stats['평균 정답률'])
+        
+        # 상관계수 정보를 별도 행으로 추가
+        corr_row = pd.DataFrame({
+            '연도': ['상관계수 (r)'],
+            '문항 수': ['-'],
+            '평균 정답률': [f"{correlation:.4f}"],
+            '표준편차': ['-']
+        })
+        
+        if '법령 문항 비율 (%)' in year_stats.columns:
+            corr_row['법령 문항 비율 (%)'] = ['-']
+        
+        p_row = pd.DataFrame({
+            '연도': ['p-value'],
+            '문항 수': ['-'],
+            '평균 정답률': [f"{p_value:.4f}"],
+            '표준편차': ['-']
+        })
+        
+        if '법령 문항 비율 (%)' in year_stats.columns:
+            p_row['법령 문항 비율 (%)'] = ['-']
+        
+        year_stats = pd.concat([year_stats, corr_row, p_row], ignore_index=True)
+    
+    return year_stats
+
+def create_difficulty_distribution_table(filtered_df, lang='ko'):
+    """표 7: 난이도 구간별 문항 분포 및 정답률"""
+    # 문제별 난이도 계산
+    difficulty = filtered_df.groupby('Question').agg({
+        '정답여부': ['mean', 'count']
+    }).reset_index()
+    difficulty.columns = ['Question', 'difficulty_score', 'attempt_count']
+    difficulty['difficulty_score'] = difficulty['difficulty_score'] * 100
+    
+    # 난이도 구간 분류
+    def classify_difficulty(score, lang='ko'):
+        if lang == 'ko':
+            if score < 20:
+                return '매우 어려움 (0-20%)'
+            elif score < 40:
+                return '어려움 (20-40%)'
+            elif score < 60:
+                return '보통 (40-60%)'
+            elif score < 80:
+                return '쉬움 (60-80%)'
+            else:
+                return '매우 쉬움 (80-100%)'
+        else:
+            if score < 20:
+                return 'Very Hard (0-20%)'
+            elif score < 40:
+                return 'Hard (20-40%)'
+            elif score < 60:
+                return 'Medium (40-60%)'
+            elif score < 80:
+                return 'Easy (60-80%)'
+            else:
+                return 'Very Easy (80-100%)'
+    
+    difficulty['난이도_구간'] = difficulty['difficulty_score'].apply(lambda x: classify_difficulty(x, lang))
+    
+    # 구간별 통계
+    difficulty_dist = difficulty.groupby('난이도_구간').agg({
+        'Question': 'count',
+        'difficulty_score': 'mean'
+    }).reset_index()
+    
+    difficulty_dist.columns = [
+        '난이도 구간' if lang == 'ko' else 'Difficulty Range',
+        '문항 수' if lang == 'ko' else 'Problem Count',
+        '평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)'
+    ]
+    
+    difficulty_dist['비율 (%)'] = (difficulty_dist['문항 수' if lang == 'ko' else 'Problem Count'] / 
+                                    difficulty_dist['문항 수' if lang == 'ko' else 'Problem Count'].sum() * 100)
+    
+    # 난이도 순서 정의
+    if lang == 'ko':
+        order = ['매우 어려움 (0-20%)', '어려움 (20-40%)', '보통 (40-60%)', '쉬움 (60-80%)', '매우 쉬움 (80-100%)']
+    else:
+        order = ['Very Hard (0-20%)', 'Hard (20-40%)', 'Medium (40-60%)', 'Easy (60-80%)', 'Very Easy (80-100%)']
+    
+    difficulty_dist['난이도 구간' if lang == 'ko' else 'Difficulty Range'] = pd.Categorical(
+        difficulty_dist['난이도 구간' if lang == 'ko' else 'Difficulty Range'],
+        categories=order,
+        ordered=True
+    )
+    
+    difficulty_dist = difficulty_dist.sort_values('난이도 구간' if lang == 'ko' else 'Difficulty Range')
+    
+    return difficulty_dist
+
+def create_incorrect_pattern_table(filtered_df, lang='ko'):
+    """표 10: 주요 오답 패턴 및 빈도 분석"""
+    # 문제별 오답 분석
+    problem_analysis = filtered_df.groupby('Question').agg({
+        '정답여부': ['sum', 'count', 'mean']
+    }).reset_index()
+    problem_analysis.columns = ['Question', 'correct_count', 'total_count', 'correct_rate']
+    problem_analysis['incorrect_rate'] = 1 - problem_analysis['correct_rate']
+    
+    # 오답 패턴 분류
+    patterns = []
+    
+    # 모든 모델이 틀린 문제
+    all_wrong = problem_analysis[problem_analysis['correct_count'] == 0]
+    patterns.append({
+        '오답 패턴 유형' if lang == 'ko' else 'Error Pattern Type': '전체 모델 오답' if lang == 'ko' else 'All Models Incorrect',
+        '문항 수' if lang == 'ko' else 'Problem Count': len(all_wrong),
+        '모델 일치도 (%)' if lang == 'ko' else 'Model Agreement (%)': 100.0
+    })
+    
+    # 대부분 모델이 틀린 문제 (70% 이상)
+    most_wrong = problem_analysis[(problem_analysis['incorrect_rate'] >= 0.7) & (problem_analysis['incorrect_rate'] < 1.0)]
+    if len(most_wrong) > 0:
+        avg_agreement = most_wrong['incorrect_rate'].mean() * 100
+        patterns.append({
+            '오답 패턴 유형' if lang == 'ko' else 'Error Pattern Type': '대부분 모델 오답 (≥70%)' if lang == 'ko' else 'Most Models Incorrect (≥70%)',
+            '문항 수' if lang == 'ko' else 'Problem Count': len(most_wrong),
+            '모델 일치도 (%)' if lang == 'ko' else 'Model Agreement (%)': round(avg_agreement, 1)
+        })
+    
+    # 절반 정도 모델이 틀린 문제
+    half_wrong = problem_analysis[(problem_analysis['incorrect_rate'] >= 0.4) & (problem_analysis['incorrect_rate'] < 0.7)]
+    if len(half_wrong) > 0:
+        avg_agreement = half_wrong['incorrect_rate'].mean() * 100
+        patterns.append({
+            '오답 패턴 유형' if lang == 'ko' else 'Error Pattern Type': '절반 정도 오답 (40-70%)' if lang == 'ko' else 'About Half Incorrect (40-70%)',
+            '문항 수' if lang == 'ko' else 'Problem Count': len(half_wrong),
+            '모델 일치도 (%)' if lang == 'ko' else 'Model Agreement (%)': round(avg_agreement, 1)
+        })
+    
+    # 일부 모델만 틀린 문제
+    some_wrong = problem_analysis[(problem_analysis['incorrect_rate'] > 0) & (problem_analysis['incorrect_rate'] < 0.4)]
+    if len(some_wrong) > 0:
+        avg_agreement = some_wrong['incorrect_rate'].mean() * 100
+        patterns.append({
+            '오답 패턴 유형' if lang == 'ko' else 'Error Pattern Type': '일부 모델 오답 (<40%)' if lang == 'ko' else 'Some Models Incorrect (<40%)',
+            '문항 수' if lang == 'ko' else 'Problem Count': len(some_wrong),
+            '모델 일치도 (%)' if lang == 'ko' else 'Model Agreement (%)': round(avg_agreement, 1)
+        })
+    
+    return pd.DataFrame(patterns)
+
 # 앙상블 모델 생성 함수
 def create_ensemble_model(base_df, ensemble_name, selected_model_names, method='majority'):
     """
@@ -966,7 +1372,10 @@ def main():
     )
     
     apply_custom_css(font_size)
-    annotation_size = set_plotly_font_size(chart_text_size)
+    set_plotly_font_size(chart_text_size)
+    
+    # 차트 주석 크기 (히트맵, 텍스트 등에 사용)
+    annotation_size = int(12 * chart_text_size)
     
     # 제목
     st.title(f"🎯 {t['title']}")
@@ -1266,7 +1675,8 @@ def main():
         f"❌ {t['incorrect_analysis']}",
         f"📈 {t['difficulty_analysis']}",
         f"💰 {t['token_cost_analysis']}",
-        f"📋 {t['testset_stats']}"
+        f"📋 {t['testset_stats']}",
+        "📑 " + ("추가 분석" if lang == 'ko' else "Additional Analysis")
     ])
     
     # 탭 1: 전체 요약
@@ -5089,6 +5499,262 @@ def main():
     - {t['law_analysis_desc']}
     - {t['detail_analysis']}
     """)
+    
+    # 탭 11: 추가 분석
+    with tabs[10]:
+        st.header("📑 " + ("추가 분석 표 및 시각화" if lang == 'ko' else "Additional Analysis Tables and Visualizations"))
+        
+        # ========== 추가 분석 표 섹션 ==========
+        
+        st.markdown("### 📊 " + ("추가 분석 표" if lang == 'ko' else "Additional Analysis Tables"))
+        st.markdown("---")
+        
+        # 표 3: 모델 출시 시기와 성능
+        st.subheader("📅 " + ("표 3: 모델 출시 시기와 SafetyQ&A 성능" if lang == 'ko' else "Table 3: Model Release Date and Performance"))
+        table3 = create_model_release_performance_table(filtered_df, lang)
+        if table3 is not None and len(table3) > 0:
+            # 날짜를 숫자로 변환 (YYYY-MM -> YYYYMM)
+            table3_copy = table3.copy()
+            date_col = '출시 시기' if lang == 'ko' else 'Release Date'
+            table3_copy['date_numeric'] = table3_copy[date_col].str.replace('-', '').astype(int)
+            
+            display_table_with_download(table3, "", "table3_model_release_performance.xlsx", lang)
+        
+        # 표 4: 응답 시간 및 파라미터
+        st.subheader("⏱️ " + ("표 4: 모델별 평균 응답 시간 및 정답률" if lang == 'ko' else "Table 4: Response Time and Accuracy by Model"))
+        table4 = create_response_time_parameters_table(filtered_df, lang)
+        if table4 is not None and len(table4) > 0:
+            display_table_with_download(table4, "", "table4_response_time_parameters.xlsx", lang)
+        else:
+            st.info("응답 시간 데이터가 없습니다." if lang == 'ko' else "No response time data available.")
+        
+        # 표 6: 출제 연도별 상관분석
+        st.subheader("📅 " + ("표 6: 출제 연도별 평균 정답률 및 상관관계" if lang == 'ko' else "Table 6: Accuracy by Year with Correlation"))
+        table6 = create_year_correlation_table(filtered_df, lang)
+        if table6 is not None and len(table6) > 0:
+            display_table_with_download(table6, "", "table6_year_correlation.xlsx", lang)
+        else:
+            st.info("연도 데이터가 없습니다." if lang == 'ko' else "No year data available.")
+        
+        # 표 7: 난이도 구간별 분포
+        st.subheader("📈 " + ("표 7: 난이도 구간별 문항 분포" if lang == 'ko' else "Table 7: Problem Distribution by Difficulty"))
+        table7 = create_difficulty_distribution_table(filtered_df, lang)
+        if table7 is not None and len(table7) > 0:
+            display_table_with_download(table7, "", "table7_difficulty_distribution.xlsx", lang)
+        
+        # 표 10: 오답 패턴
+        st.subheader("❌ " + ("표 10: 주요 오답 패턴 및 빈도" if lang == 'ko' else "Table 10: Major Error Patterns"))
+        table10 = create_incorrect_pattern_table(filtered_df, lang)
+        if table10 is not None and len(table10) > 0:
+            display_table_with_download(table10, "", "table10_error_patterns.xlsx", lang)
+        
+        # ========== 추가 시각화 섹션 ==========
+        
+        st.markdown("---")
+        st.markdown("### 📈 " + ("추가 시각화" if lang == 'ko' else "Additional Visualizations"))
+        st.markdown("---")
+        
+        # Figure 4: 출시 시기-성능 산점도
+        if table3 is not None and len(table3) > 0:
+            st.subheader("📅 " + ("Figure 4: 출시 시기-성능 추이" if lang == 'ko' else "Figure 4: Release Date vs Performance"))
+            
+            # 추세선 그리기 시도 (statsmodels 필요)
+            try:
+                fig = px.scatter(
+                    table3_copy,
+                    x='date_numeric',
+                    y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
+                    text='모델명' if lang == 'ko' else 'Model',
+                    title='모델 출시 시기와 성능 관계 (추세선 포함)' if lang == 'ko' else 'Model Release Date vs Performance (with Trendline)',
+                    trendline='ols',
+                    labels={'date_numeric': '출시 시기' if lang == 'ko' else 'Release Date'}
+                )
+                use_trendline = True
+            except (ImportError, ModuleNotFoundError):
+                # statsmodels가 없으면 추세선 없이 그리기
+                fig = px.scatter(
+                    table3_copy,
+                    x='date_numeric',
+                    y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
+                    text='모델명' if lang == 'ko' else 'Model',
+                    title='모델 출시 시기와 성능 관계' if lang == 'ko' else 'Model Release Date vs Performance',
+                    labels={'date_numeric': '출시 시기' if lang == 'ko' else 'Release Date'}
+                )
+                
+                # 수동으로 간단한 추세선 추가 (numpy는 이미 상단에서 import됨)
+                x_numeric = table3_copy['date_numeric'].values
+                y_values = table3_copy['평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)'].values
+                
+                # 선형 회귀 계산
+                z = np.polyfit(x_numeric, y_values, 1)
+                p = np.poly1d(z)
+                
+                # 추세선 추가
+                fig.add_scatter(
+                    x=x_numeric,
+                    y=p(x_numeric),
+                    mode='lines',
+                    name='추세선' if lang == 'ko' else 'Trend',
+                    line=dict(color='red', dash='dash')
+                )
+                use_trendline = False
+            
+            # X축 레이블을 원래 날짜 형식으로 변경
+            tickvals = sorted(table3_copy['date_numeric'].unique())
+            ticktext = [f"{str(val)[:4]}-{str(val)[4:]}" for val in tickvals]
+            
+            fig.update_traces(textposition='top center', marker=dict(size=10), selector=dict(mode='markers'))
+            fig.update_layout(
+                height=500,
+                xaxis=dict(
+                    tickmode='array',
+                    tickvals=tickvals,
+                    ticktext=ticktext
+                )
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Figure 8: 난이도별 레이더 차트
+        if '정답여부' in filtered_df.columns:
+            st.subheader("🎯 " + ("Figure 8: 난이도 구간별 모델 성능 레이더 차트" if lang == 'ko' else "Figure 8: Model Performance Radar by Difficulty"))
+            
+            # 문제별 난이도 계산
+            difficulty = filtered_df.groupby('Question')['정답여부'].mean() * 100
+            
+            # 난이도 구간 분류
+            def classify_difficulty_simple(score):
+                if score < 20:
+                    return '매우 어려움' if lang == 'ko' else 'Very Hard'
+                elif score < 40:
+                    return '어려움' if lang == 'ko' else 'Hard'
+                elif score < 60:
+                    return '보통' if lang == 'ko' else 'Medium'
+                elif score < 80:
+                    return '쉬움' if lang == 'ko' else 'Easy'
+                else:
+                    return '매우 쉬움' if lang == 'ko' else 'Very Easy'
+            
+            filtered_df_copy = filtered_df.copy()
+            filtered_df_copy['difficulty_level'] = filtered_df_copy['Question'].map(
+                lambda q: classify_difficulty_simple(difficulty.get(q, 50))
+            )
+            
+            # 상위 5개 모델 선택
+            top_models = filtered_df.groupby('모델')['정답여부'].mean().nlargest(5).index.tolist()
+            radar_df = filtered_df_copy[filtered_df_copy['모델'].isin(top_models)]
+            
+            # 모델별 난이도별 성능
+            radar_data = radar_df.groupby(['모델', 'difficulty_level'])['정답여부'].mean() * 100
+            radar_pivot = radar_data.unstack(fill_value=0)
+            
+            if len(radar_pivot) > 0 and len(radar_pivot.columns) > 0:
+                # 레이더 차트 생성
+                fig = go.Figure()
+                
+                for model in radar_pivot.index:
+                    fig.add_trace(go.Scatterpolar(
+                        r=radar_pivot.loc[model].values,
+                        theta=radar_pivot.columns,
+                        fill='toself',
+                        name=model
+                    ))
+                
+                fig.update_layout(
+                    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                    showlegend=True,
+                    title='난이도별 모델 성능 비교' if lang == 'ko' else 'Model Performance by Difficulty',
+                    height=600
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("레이더 차트를 생성할 데이터가 부족합니다." if lang == 'ko' else "Insufficient data for radar chart.")
+        
+        # Figure 10: 오답 패턴 원형 차트
+        if table10 is not None and len(table10) > 0:
+            st.subheader("🥧 " + ("Figure 10: 오답 패턴 빈도 원형 차트" if lang == 'ko' else "Figure 10: Error Pattern Distribution"))
+            
+            fig = px.pie(
+                table10,
+                values='문항 수' if lang == 'ko' else 'Problem Count',
+                names='오답 패턴 유형' if lang == 'ko' else 'Error Pattern Type',
+                title='오답 패턴별 비율' if lang == 'ko' else 'Distribution of Error Patterns'
+            )
+            fig.update_traces(textposition='inside', textinfo='percent+label')
+            fig.update_layout(height=500)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Figure 11: 모델별 오답 일치도 히트맵
+        st.subheader("🔥 " + ("Figure 11: 모델별 오답 일치도 히트맵" if lang == 'ko' else "Figure 11: Model Error Agreement Heatmap"))
+        
+        models_list = filtered_df['모델'].unique()
+        
+        if len(models_list) >= 2:
+            # 모델 쌍별 오답 일치도 계산
+            agreement_matrix = []
+            
+            for model1 in models_list:
+                row = []
+                for model2 in models_list:
+                    if model1 == model2:
+                        row.append(100.0)
+                    else:
+                        # 두 모델이 모두 평가한 문제
+                        model1_df = filtered_df[filtered_df['모델'] == model1]
+                        model2_df = filtered_df[filtered_df['모델'] == model2]
+                        
+                        common_questions = set(model1_df['Question']) & set(model2_df['Question'])
+                        
+                        if len(common_questions) > 0:
+                            # 두 모델이 모두 틀린 문제 수
+                            both_wrong = 0
+                            for q in common_questions:
+                                q1_correct = model1_df[model1_df['Question'] == q]['정답여부'].values[0]
+                                q2_correct = model2_df[model2_df['Question'] == q]['정답여부'].values[0]
+                                
+                                if not q1_correct and not q2_correct:
+                                    both_wrong += 1
+                            
+                            # 적어도 한 모델이 틀린 문제 중 두 모델이 모두 틀린 비율
+                            model1_wrong = sum(~model1_df[model1_df['Question'].isin(common_questions)]['정답여부'])
+                            model2_wrong = sum(~model2_df[model2_df['Question'].isin(common_questions)]['정답여부'])
+                            
+                            total_wrong = model1_wrong + model2_wrong - both_wrong
+                            
+                            if total_wrong > 0:
+                                agreement = (both_wrong / total_wrong) * 100
+                            else:
+                                agreement = 0
+                        else:
+                            agreement = 0
+                    
+                    row.append(round(agreement, 1))
+                
+                agreement_matrix.append(row)
+            
+            # 히트맵 생성
+            fig = go.Figure(data=go.Heatmap(
+                z=agreement_matrix,
+                x=models_list,
+                y=models_list,
+                colorscale='Reds',
+                text=agreement_matrix,
+                texttemplate='%{text:.1f}',
+                textfont={"size": int(10 * chart_text_size)},
+                colorbar=dict(title="일치도 (%)" if lang == 'ko' else "Agreement (%)")
+            ))
+            
+            fig.update_layout(
+                title='모델 간 오답 일치도' if lang == 'ko' else 'Error Agreement Between Models',
+                height=600,
+                xaxis_title='모델' if lang == 'ko' else 'Model',
+                yaxis_title='모델' if lang == 'ko' else 'Model'
+            )
+            fig.update_xaxes(tickangle=45)
+            
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("모델이 2개 이상 필요합니다." if lang == 'ko' else "At least 2 models required.")
     
     st.sidebar.info(f"📊 {t['current_data']}: {len(filtered_df):,}{t['problems']}")
 

@@ -543,16 +543,97 @@ def create_csv_download_button(df, filename, button_text="📄 CSV로 다운로�
         mime="text/csv"
     )
 
+def create_copy_button(df, button_text="📋 클립보드로 복사"):
+    """데이터프레임을 클립보드로 복사하는 버튼 생성"""
+    # TSV 형식으로 변환 (Excel에 붙여넣기 최적화)
+    tsv_data = df.to_csv(index=False, sep='\t')
+    
+    # 고유 ID 생성
+    import hashlib
+    button_id = hashlib.md5(tsv_data.encode()).hexdigest()[:8]
+    
+    # HTML + JavaScript로 클립보드 복사 구현
+    copy_button_html = f"""
+    <style>
+        .copy-button-{button_id} {{
+            background-color: #FF4B4B;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }}
+        .copy-button-{button_id}:hover {{
+            background-color: #FF6B6B;
+        }}
+        .copy-button-{button_id}:active {{
+            background-color: #FF2B2B;
+        }}
+        .copy-success-{button_id} {{
+            color: #00C851;
+            font-size: 12px;
+            margin-left: 10px;
+            display: none;
+        }}
+    </style>
+    
+    <button class="copy-button-{button_id}" onclick="copyToClipboard_{button_id}()">
+        {button_text}
+    </button>
+    <span class="copy-success-{button_id}" id="success-{button_id}">✓ 복사됨!</span>
+    
+    <script>
+    function copyToClipboard_{button_id}() {{
+        const data = `{tsv_data}`;
+        
+        navigator.clipboard.writeText(data).then(function() {{
+            // 성공 메시지 표시
+            const successMsg = document.getElementById('success-{button_id}');
+            successMsg.style.display = 'inline';
+            setTimeout(function() {{
+                successMsg.style.display = 'none';
+            }}, 2000);
+        }}, function(err) {{
+            // 실패 시 대체 방법 시도
+            const textArea = document.createElement("textarea");
+            textArea.value = data;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {{
+                document.execCommand('copy');
+                const successMsg = document.getElementById('success-{button_id}');
+                successMsg.style.display = 'inline';
+                setTimeout(function() {{
+                    successMsg.style.display = 'none';
+                }}, 2000);
+            }} catch (err) {{
+                alert('복사 실패: ' + err);
+            }}
+            document.body.removeChild(textArea);
+        }});
+    }}
+    </script>
+    """
+    
+    st.markdown(copy_button_html, unsafe_allow_html=True)
+
 def display_table_with_download(df, title, excel_filename, lang='ko'):
-    """표를 표시하고 다운로드 버튼을 함께 제공"""
+    """표를 표시하고 다운로드/복사 버튼을 함께 제공"""
     if title:
         st.markdown(f"### {title}")
     
-    col1, col2 = st.columns([1, 4])
+    col1, col2, col3 = st.columns([1, 1, 3])
     with col1:
         create_download_button(df, excel_filename)
     with col2:
         create_csv_download_button(df, excel_filename.replace('.xlsx', '.csv'))
+    with col3:
+        create_copy_button(df, "📋 " + ("클립보드로 복사" if lang == 'ko' else "Copy to Clipboard"))
     
     st.dataframe(df, use_container_width=True)
     st.markdown("---")

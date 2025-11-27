@@ -5581,8 +5581,7 @@ def main():
                     labels={'date_numeric': '출시 시기' if lang == 'ko' else 'Release Date'}
                 )
                 
-                # 수동으로 간단한 추세선 추가
-                import numpy as np
+                # 수동으로 간단한 추세선 추가 (numpy는 이미 상단에서 import됨)
                 x_numeric = table3_copy['date_numeric'].values
                 y_values = table3_copy['평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)'].values
                 

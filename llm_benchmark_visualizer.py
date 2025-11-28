@@ -543,24 +543,41 @@ def create_csv_download_button(df, filename, button_text="📄 CSV로 다운로�
         mime="text/csv"
     )
 
-def create_copy_button(df, button_text="📋 클립보드로 복사"):
-    """데이터프레임을 클립보드로 복사하는 버튼 생성 - Streamlit 네이티브 방식"""
-    # TSV 형식으로 변환 (Excel에 붙여넣기 최적화)
+def create_copy_button(df, button_text="📋 클립보드로 복사", key_suffix=""):
+    """데이터프레임을 클립보드로 복사하는 버튼 생성 - 헤더 포함"""
+    # 헤더 포함한 TSV 형식으로 변환
     tsv_data = df.to_csv(index=False, sep='\t')
     
-    # Streamlit 기본 복사 버튼 사용 (더 안정적)
-    st.download_button(
-        label=button_text,
-        data=tsv_data,
-        file_name="clipboard_data.tsv",
-        mime="text/tab-separated-values",
-        help="다운로드 후 Excel에 붙여넣거나, 다운로드한 파일을 Excel에서 열기"
-    )
+    # 고유 key 생성 (중복 방지)
+    import hashlib
+    data_hash = hashlib.md5(tsv_data.encode()).hexdigest()[:8]
+    unique_key = f"tsv_download_{data_hash}_{key_suffix}"
+    
+    # 2개 컬럼으로 분할: 다운로드 버튼 + 복사 가이드
+    col_a, col_b = st.columns([1, 2])
+    
+    with col_a:
+        # TSV 다운로드 버튼
+        st.download_button(
+            label=button_text,
+            data=tsv_data,
+            file_name="data_with_headers.tsv",
+            mime="text/tab-separated-values",
+            key=unique_key,
+            help="Excel에서 열면 헤더 포함"
+        )
+    
+    with col_b:
+        # 헤더 포함 복사 가이드
+        st.caption("💡 헤더 포함 복사: 표 좌측 상단 📋 클릭")
 
 def display_table_with_download(df, title, excel_filename, lang='ko'):
     """표를 표시하고 다운로드/복사 버튼을 함께 제공"""
     if title:
         st.markdown(f"### {title}")
+    
+    # 고유 key 생성용 suffix (파일명 기반)
+    key_suffix = excel_filename.replace('.xlsx', '').replace('.csv', '')
     
     col1, col2, col3 = st.columns([1, 1, 3])
     with col1:
@@ -568,9 +585,9 @@ def display_table_with_download(df, title, excel_filename, lang='ko'):
     with col2:
         create_csv_download_button(df, excel_filename.replace('.xlsx', '.csv'))
     with col3:
-        create_copy_button(df, "📋 " + ("TSV 다운로드" if lang == 'ko' else "Download TSV"))
+        create_copy_button(df, "📋 " + ("TSV 다운로드" if lang == 'ko' else "Download TSV"), key_suffix)
     
-    st.dataframe(df, width='stretch')  # use_container_width 대신 width 사용
+    st.dataframe(df, width='stretch')
     st.markdown("---")
 
 # ========== 모델 정보 추정 함수 ==========

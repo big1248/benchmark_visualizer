@@ -773,6 +773,72 @@ def create_response_time_parameters_table(filtered_df, lang='ko'):
     df = pd.DataFrame(data).sort_values('파라미터 수 (B)' if lang == 'ko' else 'Parameters (B)', ascending=False)
     return df
 
+def create_law_nonlaw_comparison_table(filtered_df, testsets, lang='ko'):
+    """표 2: 테스트셋별 법령/비법령 정답률 비교"""
+    if '테스트명' not in filtered_df.columns or 'law' not in filtered_df.columns:
+        return None
+    
+    test_names = filtered_df['테스트명'].unique()
+    
+    data = []
+    for test_name in test_names:
+        testset_df = filtered_df[filtered_df['테스트명'] == test_name]
+        
+        # 법령 문제 통계
+        law_df = testset_df[testset_df['law'] == 'O']
+        non_law_df = testset_df[testset_df['law'] != 'O']
+        
+        # 실제 문제 수는 testsets에서
+        law_problems = 0
+        non_law_problems = 0
+        total_problems = 0
+        
+        if test_name in testsets and 'law' in testsets[test_name].columns:
+            test_data = testsets[test_name]
+            law_problems = len(test_data[test_data['law'] == 'O'])
+            non_law_problems = len(test_data[test_data['law'] != 'O'])
+            total_problems = len(test_data)
+        else:
+            # Fallback: filtered_df에서 고유 문제 수로 계산
+            unique_law = testset_df[testset_df['law'] == 'O']['Question'].nunique() if 'Question' in testset_df.columns else len(law_df)
+            unique_non_law = testset_df[testset_df['law'] != 'O']['Question'].nunique() if 'Question' in testset_df.columns else len(non_law_df)
+            law_problems = unique_law
+            non_law_problems = unique_non_law
+            total_problems = law_problems + non_law_problems
+        
+        # 정답률 계산
+        law_acc = 0
+        non_law_acc = 0
+        
+        if '정답여부' in testset_df.columns:
+            law_acc = (law_df['정답여부'].mean() * 100) if len(law_df) > 0 else 0
+            non_law_acc = (non_law_df['정답여부'].mean() * 100) if len(non_law_df) > 0 else 0
+        
+        # 정답 수
+        law_correct = law_df['정답여부'].sum() if len(law_df) > 0 and '정답여부' in law_df.columns else 0
+        non_law_correct = non_law_df['정답여부'].sum() if len(non_law_df) > 0 and '정답여부' in non_law_df.columns else 0
+        
+        # 정답률 차이
+        diff = law_acc - non_law_acc
+        
+        # 법령 문제 비율
+        law_ratio = (law_problems / total_problems * 100) if total_problems > 0 else 0
+        
+        data.append({
+            '테스트명' if lang == 'ko' else 'Test Name': test_name,
+            '법령 문제 수' if lang == 'ko' else 'Law Problems': law_problems,
+            '법령 정답률 (%)' if lang == 'ko' else 'Law Accuracy (%)': round(law_acc, 2),
+            '법령 정답 수' if lang == 'ko' else 'Law Correct': int(law_correct),
+            '비법령 문제 수' if lang == 'ko' else 'Non-Law Problems': non_law_problems,
+            '비법령 정답률 (%)' if lang == 'ko' else 'Non-Law Accuracy (%)': round(non_law_acc, 2),
+            '비법령 정답 수' if lang == 'ko' else 'Non-Law Correct': int(non_law_correct),
+            '정답률 차이 (법령-비법령)' if lang == 'ko' else 'Accuracy Diff (Law-NonLaw)': round(diff, 2),
+            '법령 문제 비율 (%)' if lang == 'ko' else 'Law Ratio (%)': round(law_ratio, 1)
+        })
+    
+    df = pd.DataFrame(data).sort_values('법령 문제 비율 (%)' if lang == 'ko' else 'Law Ratio (%)', ascending=False)
+    return df
+
 def create_year_correlation_table(filtered_df, lang='ko'):
     """표 6: 출제 연도별 평균 정답률 및 문항 수 (상관계수 포함)"""
     if 'Year' not in filtered_df.columns:
@@ -5571,6 +5637,105 @@ def main():
             st.plotly_chart(fig, width='stretch')
         else:
             st.info("테스트셋 데이터가 없습니다." if lang == 'ko' else "No test set data available.")
+        
+        st.markdown("---")
+        
+        # 표 2: 법령/비법령 정답률 비교 (NEW!)
+        st.subheader("⚖️ " + ("표 2: 테스트셋별 법령/비법령 정답률 비교" if lang == 'ko' else "Table 2: Law vs Non-Law Accuracy Comparison by Test Set"))
+        table2 = create_law_nonlaw_comparison_table(filtered_df, testsets, lang)
+        if table2 is not None and len(table2) > 0:
+            display_table_with_download(table2, "", "table2_law_nonlaw_comparison.xlsx", lang)
+            
+            # 간단한 시각화 추가 - 법령 vs 비법령 정답률
+            st.markdown("#### " + ("법령 vs 비법령 정답률 비교" if lang == 'ko' else "Law vs Non-Law Accuracy Comparison"))
+            
+            # 데이터 준비
+            chart_data = []
+            for _, row in table2.iterrows():
+                test_name = row['테스트명' if lang == 'ko' else 'Test Name']
+                chart_data.append({
+                    '테스트명' if lang == 'ko' else 'Test Name': test_name,
+                    '구분' if lang == 'ko' else 'Type': '법령' if lang == 'ko' else 'Law',
+                    '정답률 (%)' if lang == 'ko' else 'Accuracy (%)': row['법령 정답률 (%)' if lang == 'ko' else 'Law Accuracy (%)']
+                })
+                chart_data.append({
+                    '테스트명' if lang == 'ko' else 'Test Name': test_name,
+                    '구분' if lang == 'ko' else 'Type': '비법령' if lang == 'ko' else 'Non-Law',
+                    '정답률 (%)' if lang == 'ko' else 'Accuracy (%)': row['비법령 정답률 (%)' if lang == 'ko' else 'Non-Law Accuracy (%)']
+                })
+            
+            chart_df = pd.DataFrame(chart_data)
+            
+            fig = px.bar(
+                chart_df,
+                x='테스트명' if lang == 'ko' else 'Test Name',
+                y='정답률 (%)' if lang == 'ko' else 'Accuracy (%)',
+                color='구분' if lang == 'ko' else 'Type',
+                barmode='group',
+                title='테스트셋별 법령/비법령 정답률 비교' if lang == 'ko' else 'Law vs Non-Law Accuracy by Test Set',
+                color_discrete_map={
+                    '법령' if lang == 'ko' else 'Law': '#FF6B6B',
+                    '비법령' if lang == 'ko' else 'Non-Law': '#4ECDC4'
+                }
+            )
+            fig.update_traces(
+                marker_line_color='black',
+                marker_line_width=1.5
+            )
+            fig.update_layout(
+                height=400,
+                yaxis_title='정답률 (%)' if lang == 'ko' else 'Accuracy (%)',
+                xaxis_title='테스트명' if lang == 'ko' else 'Test Name',
+                yaxis=dict(range=[0, 100]),
+                legend=dict(
+                    title='구분' if lang == 'ko' else 'Type',
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1
+                )
+            )
+            fig.update_xaxes(tickangle=45)
+            st.plotly_chart(fig, width='stretch')
+            
+            # 정답률 차이 막대 그래프
+            st.markdown("#### " + ("정답률 차이 (법령 - 비법령)" if lang == 'ko' else "Accuracy Difference (Law - Non-Law)"))
+            fig2 = px.bar(
+                table2,
+                x='테스트명' if lang == 'ko' else 'Test Name',
+                y='정답률 차이 (법령-비법령)' if lang == 'ko' else 'Accuracy Diff (Law-NonLaw)',
+                text='정답률 차이 (법령-비법령)' if lang == 'ko' else 'Accuracy Diff (Law-NonLaw)',
+                color='정답률 차이 (법령-비법령)' if lang == 'ko' else 'Accuracy Diff (Law-NonLaw)',
+                color_continuous_scale='RdYlGn',
+                title='법령 문제의 상대적 난이도' if lang == 'ko' else 'Relative Difficulty of Law Problems'
+            )
+            fig2.update_traces(
+                texttemplate='%{text:.1f}%p',
+                textposition='outside',
+                marker_line_color='black',
+                marker_line_width=1.5
+            )
+            fig2.update_layout(
+                height=400,
+                showlegend=False,
+                yaxis_title='정답률 차이 (%p)' if lang == 'ko' else 'Accuracy Difference (%p)',
+                xaxis_title='테스트명' if lang == 'ko' else 'Test Name'
+            )
+            fig2.update_xaxes(tickangle=45)
+            st.plotly_chart(fig2, width='stretch')
+            
+            # 인사이트 표시
+            avg_diff = table2['정답률 차이 (법령-비법령)' if lang == 'ko' else 'Accuracy Diff (Law-NonLaw)'].mean()
+            if avg_diff > 0:
+                insight = f"💡 평균적으로 법령 문제가 비법령 문제보다 {abs(avg_diff):.1f}%p 더 쉽습니다." if lang == 'ko' else f"💡 On average, law problems are {abs(avg_diff):.1f}%p easier than non-law problems."
+            elif avg_diff < 0:
+                insight = f"💡 평균적으로 법령 문제가 비법령 문제보다 {abs(avg_diff):.1f}%p 더 어렵습니다." if lang == 'ko' else f"💡 On average, law problems are {abs(avg_diff):.1f}%p harder than non-law problems."
+            else:
+                insight = "💡 법령 문제와 비법령 문제의 난이도가 비슷합니다." if lang == 'ko' else "💡 Law and non-law problems have similar difficulty."
+            st.info(insight)
+        else:
+            st.info("법령 데이터가 없습니다." if lang == 'ko' else "No law classification data available.")
         
         st.markdown("---")
         

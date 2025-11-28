@@ -647,21 +647,41 @@ def calculate_model_parameters(model_name):
 
 # ========== 추가 분석 표 생성 함수 ==========
 
-def create_testset_accuracy_table(filtered_df, lang='ko'):
-    """테스트셋별 평균 정답률 표"""
+def create_testset_accuracy_table(filtered_df, testsets, lang='ko'):
+    """테스트셋별 평균 정답률 표 - 테스트셋 원본 데이터 사용"""
     if '테스트명' not in filtered_df.columns:
         return None
     
-    testsets = filtered_df['테스트명'].unique()
+    test_names = filtered_df['테스트명'].unique()
     
     data = []
-    for testset in testsets:
-        testset_df = filtered_df[filtered_df['테스트명'] == testset]
+    for test_name in test_names:
+        # 해당 테스트의 평가 결과
+        testset_df = filtered_df[filtered_df['테스트명'] == test_name]
         
-        # 기본 통계
-        total_problems = testset_df['Question'].nunique() if 'Question' in testset_df.columns else len(testset_df)
-        total_evaluations = len(testset_df)
+        # 실제 문제 수는 testsets에서 가져오기
+        if test_name in testsets:
+            actual_problems = len(testsets[test_name])
+            
+            # 법령 문제 비율도 testsets에서 계산
+            law_ratio = 0
+            if 'law' in testsets[test_name].columns:
+                law_count = len(testsets[test_name][testsets[test_name]['law'] == 'O'])
+                law_ratio = (law_count / actual_problems * 100) if actual_problems > 0 else 0
+        else:
+            # testsets에 없으면 고유 문제 수로 추정
+            actual_problems = testset_df['Question'].nunique() if 'Question' in testset_df.columns else len(testset_df)
+            
+            # 법령 문제 비율
+            law_ratio = 0
+            if 'law' in testset_df.columns:
+                unique_problems = testset_df.drop_duplicates(subset=['Question'])
+                law_count = len(unique_problems[unique_problems['law'] == 'O'])
+                law_ratio = (law_count / actual_problems * 100) if actual_problems > 0 else 0
+        
+        # 평가 통계
         num_models = testset_df['모델'].nunique()
+        total_evaluations = len(testset_df)
         
         # 정확도 계산
         if '정답여부' in testset_df.columns:
@@ -671,16 +691,9 @@ def create_testset_accuracy_table(filtered_df, lang='ko'):
             accuracy = 0
             correct_count = 0
         
-        # 법령 문제 비율
-        law_ratio = 0
-        if 'law' in testset_df.columns:
-            unique_problems = testset_df.drop_duplicates(subset=['Question'])
-            law_count = len(unique_problems[unique_problems['law'] == 'O'])
-            law_ratio = (law_count / total_problems * 100) if total_problems > 0 else 0
-        
         data.append({
-            '테스트명' if lang == 'ko' else 'Test Name': testset,
-            '문제 수' if lang == 'ko' else 'Problems': total_problems,
+            '테스트명' if lang == 'ko' else 'Test Name': test_name,
+            '문제 수' if lang == 'ko' else 'Problems': actual_problems,
             '평가 모델 수' if lang == 'ko' else 'Models': num_models,
             '총 평가 횟수' if lang == 'ko' else 'Total Evaluations': total_evaluations,
             '평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)': round(accuracy, 2),
@@ -5507,7 +5520,7 @@ def main():
         
         # 표 1: 테스트셋별 평균 정답률 (NEW!)
         st.subheader("📋 " + ("표 1: 테스트셋별 평균 정답률 및 통계" if lang == 'ko' else "Table 1: Average Accuracy and Statistics by Test Set"))
-        table1 = create_testset_accuracy_table(filtered_df, lang)
+        table1 = create_testset_accuracy_table(filtered_df, testsets, lang)
         if table1 is not None and len(table1) > 0:
             display_table_with_download(table1, "", "table1_testset_accuracy.xlsx", lang)
             

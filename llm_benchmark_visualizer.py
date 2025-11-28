@@ -691,12 +691,31 @@ def create_testset_accuracy_table(filtered_df, testsets, lang='ko'):
             accuracy = 0
             correct_count = 0
         
+        # 과목별 정답률 계산
+        best_subject = ""
+        best_subject_acc = 0
+        worst_subject = ""
+        worst_subject_acc = 100
+        
+        if 'Subject' in testset_df.columns and '정답여부' in testset_df.columns:
+            subject_acc = testset_df.groupby('Subject')['정답여부'].mean() * 100
+            if len(subject_acc) > 0:
+                best_idx = subject_acc.idxmax()
+                best_subject_acc = subject_acc[best_idx]
+                best_subject = f"{best_idx} ({best_subject_acc:.1f}%)"
+                
+                worst_idx = subject_acc.idxmin()
+                worst_subject_acc = subject_acc[worst_idx]
+                worst_subject = f"{worst_idx} ({worst_subject_acc:.1f}%)"
+        
         data.append({
             '테스트명' if lang == 'ko' else 'Test Name': test_name,
             '문제 수' if lang == 'ko' else 'Problems': actual_problems,
             '평가 모델 수' if lang == 'ko' else 'Models': num_models,
             '총 평가 횟수' if lang == 'ko' else 'Total Evaluations': total_evaluations,
             '평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)': round(accuracy, 2),
+            '최고 과목 (정답률)' if lang == 'ko' else 'Best Subject (Accuracy)': best_subject if best_subject else '-',
+            '최저 과목 (정답률)' if lang == 'ko' else 'Worst Subject (Accuracy)': worst_subject if worst_subject else '-',
             '정답 수' if lang == 'ko' else 'Correct': int(correct_count),
             '법령 문제 비율 (%)' if lang == 'ko' else 'Law Problem Ratio (%)': round(law_ratio, 1)
         })

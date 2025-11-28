@@ -647,6 +647,50 @@ def calculate_model_parameters(model_name):
 
 # ========== 추가 분석 표 생성 함수 ==========
 
+def create_testset_accuracy_table(filtered_df, lang='ko'):
+    """테스트셋별 평균 정답률 표"""
+    if '테스트명' not in filtered_df.columns:
+        return None
+    
+    testsets = filtered_df['테스트명'].unique()
+    
+    data = []
+    for testset in testsets:
+        testset_df = filtered_df[filtered_df['테스트명'] == testset]
+        
+        # 기본 통계
+        total_problems = testset_df['Question'].nunique() if 'Question' in testset_df.columns else len(testset_df)
+        total_evaluations = len(testset_df)
+        num_models = testset_df['모델'].nunique()
+        
+        # 정확도 계산
+        if '정답여부' in testset_df.columns:
+            accuracy = testset_df['정답여부'].mean() * 100
+            correct_count = testset_df['정답여부'].sum()
+        else:
+            accuracy = 0
+            correct_count = 0
+        
+        # 법령 문제 비율
+        law_ratio = 0
+        if 'law' in testset_df.columns:
+            unique_problems = testset_df.drop_duplicates(subset=['Question'])
+            law_count = len(unique_problems[unique_problems['law'] == 'O'])
+            law_ratio = (law_count / total_problems * 100) if total_problems > 0 else 0
+        
+        data.append({
+            '테스트명' if lang == 'ko' else 'Test Name': testset,
+            '문제 수' if lang == 'ko' else 'Problems': total_problems,
+            '평가 모델 수' if lang == 'ko' else 'Models': num_models,
+            '총 평가 횟수' if lang == 'ko' else 'Total Evaluations': total_evaluations,
+            '평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)': round(accuracy, 2),
+            '정답 수' if lang == 'ko' else 'Correct': int(correct_count),
+            '법령 문제 비율 (%)' if lang == 'ko' else 'Law Problem Ratio (%)': round(law_ratio, 1)
+        })
+    
+    df = pd.DataFrame(data).sort_values('평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)', ascending=False)
+    return df
+
 def create_model_release_performance_table(filtered_df, lang='ko'):
     """표 3: 모델 출시 시기와 SafetyQ&A 성능"""
     models = filtered_df['모델'].unique()
@@ -5459,6 +5503,43 @@ def main():
         # ========== 추가 분석 표 섹션 ==========
         
         st.markdown("### 📊 " + ("추가 분석 표" if lang == 'ko' else "Additional Analysis Tables"))
+        st.markdown("---")
+        
+        # 표 1: 테스트셋별 평균 정답률 (NEW!)
+        st.subheader("📋 " + ("표 1: 테스트셋별 평균 정답률 및 통계" if lang == 'ko' else "Table 1: Average Accuracy and Statistics by Test Set"))
+        table1 = create_testset_accuracy_table(filtered_df, lang)
+        if table1 is not None and len(table1) > 0:
+            display_table_with_download(table1, "", "table1_testset_accuracy.xlsx", lang)
+            
+            # 간단한 시각화 추가
+            st.markdown("#### " + ("테스트셋별 정확도 비교" if lang == 'ko' else "Accuracy Comparison by Test Set"))
+            fig = px.bar(
+                table1,
+                x='테스트명' if lang == 'ko' else 'Test Name',
+                y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
+                text='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
+                color='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
+                color_continuous_scale='RdYlGn',
+                title='테스트셋별 평균 정답률' if lang == 'ko' else 'Average Accuracy by Test Set'
+            )
+            fig.update_traces(
+                texttemplate='%{text:.1f}%',
+                textposition='outside',
+                marker_line_color='black',
+                marker_line_width=1.5
+            )
+            fig.update_layout(
+                height=400,
+                showlegend=False,
+                yaxis_title='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
+                xaxis_title='테스트명' if lang == 'ko' else 'Test Name',
+                yaxis=dict(range=[0, 100])
+            )
+            fig.update_xaxes(tickangle=45)
+            st.plotly_chart(fig, width='stretch')
+        else:
+            st.info("테스트셋 데이터가 없습니다." if lang == 'ko' else "No test set data available.")
+        
         st.markdown("---")
         
         # 표 3: 모델 출시 시기와 성능

@@ -856,43 +856,62 @@ def create_year_correlation_table(filtered_df, lang='ko'):
         '정답여부': ['mean', 'std']
     }).reset_index()
     
-    year_stats.columns = ['연도', '문항 수', '평균 정답률', '표준편차']
-    year_stats['평균 정답률'] = year_stats['평균 정답률'] * 100
-    year_stats['표준편차'] = year_stats['표준편차'] * 100
-    year_stats['연도'] = year_stats['연도'].astype(int)
+    # 다국어 컬럼명
+    if lang == 'ko':
+        year_stats.columns = ['연도', '문항 수', '평균 정답률', '표준편차']
+        year_col = '연도'
+        count_col = '문항 수'
+        acc_col = '평균 정답률'
+        std_col = '표준편차'
+        law_ratio_col = '법령 문항 비율 (%)'
+        corr_label = '상관계수 (r)'
+        p_label = 'p-value'
+    else:
+        year_stats.columns = ['Year', 'Problem Count', 'Avg Accuracy', 'Std Dev']
+        year_col = 'Year'
+        count_col = 'Problem Count'
+        acc_col = 'Avg Accuracy'
+        std_col = 'Std Dev'
+        law_ratio_col = 'Law Ratio (%)'
+        corr_label = 'Correlation (r)'
+        p_label = 'p-value'
+    
+    year_stats[acc_col] = year_stats[acc_col] * 100
+    year_stats[std_col] = year_stats[std_col] * 100
+    year_stats[year_col] = year_stats[year_col].astype(int)
     
     # 법령 문항 비율
     if 'law' in year_df.columns:
         law_ratio = year_df.groupby('Year_Int').apply(
             lambda x: (x['law'] == 'O').sum() / len(x) * 100
         ).reset_index()
-        law_ratio.columns = ['연도', '법령 문항 비율 (%)']
-        year_stats = year_stats.merge(law_ratio, on='연도', how='left')
+        law_ratio.columns = [year_col, law_ratio_col]
+        year_stats = year_stats.merge(law_ratio, on=year_col, how='left')
     
     # 상관계수 계산
     if len(year_stats) > 1:
-        correlation, p_value = stats.pearsonr(year_stats['연도'], year_stats['평균 정답률'])
+        correlation, p_value = stats.pearsonr(year_stats[year_col], year_stats[acc_col])
         
         # 상관계수 정보를 별도 행으로 추가
         corr_row = pd.DataFrame({
-            '연도': ['상관계수 (r)'],
-            '문항 수': ['-'],
-            '평균 정답률': [f"{correlation:.4f}"],
-            '표준편차': ['-']
+            year_col: [corr_label],
+            count_col: ['-'],
+            acc_col: [f"{correlation:.4f}"],
+            std_col: ['-']
         })
         
-        if '법령 문항 비율 (%)' in year_stats.columns:
-            corr_row['법령 문항 비율 (%)'] = ['-']
+        if law_ratio_col in year_stats.columns:
+            corr_row[law_ratio_col] = ['-']
         
         p_row = pd.DataFrame({
-            '연도': ['p-value'],
-            '문항 수': ['-'],
-            '평균 정답률': [f"{p_value:.4f}"],
-            '표준편차': ['-']
+            year_col: [p_label],
+            count_col: ['-'],
+            acc_col: [f"{p_value:.4f}"],
+            std_col: ['-']
         })
         
-        if '법령 문항 비율 (%)' in year_stats.columns:
-            p_row['법령 문항 비율 (%)'] = ['-']
+        if law_ratio_col in year_stats.columns:
+            p_row[law_ratio_col] = ['-']
         
         year_stats = pd.concat([year_stats, corr_row, p_row], ignore_index=True)
     
@@ -6269,38 +6288,64 @@ def main():
         if table6 is not None and len(table6) > 0:
             st.subheader("📈 " + ("Figure 7: 출제 연도별 정답률 추이" if lang == 'ko' else "Figure 7: Accuracy Trend by Year"))
             
-            # 상관계수, p-value 행 제거 (연도가 숫자가 아닌 행)
+            # 상관계수, p-value 행 제거
             year_col = '연도' if lang == 'ko' else 'Year'
+            # 실제 컬럼명 확인 (표 6에서는 '평균 정답률'로 저장됨)
+            acc_col = '평균 정답률' if lang == 'ko' else 'Avg Accuracy'
+            
             plot_data = table6.copy()
             
-            # 연도가 숫자인 행만 필터링
-            if year_col in plot_data.columns:
-                plot_data = plot_data[plot_data[year_col].apply(lambda x: str(x).replace('.', '').isdigit())]
+            # 연도와 정답률이 모두 숫자인 행만 선택
+            if year_col in plot_data.columns and acc_col in plot_data.columns:
+                # 1. 특정 문자열 행 제거
+                exclude_keywords = ['상관계수', 'p-value', 'correlation', 'Correlation']
+                for keyword in exclude_keywords:
+                    plot_data = plot_data[~plot_data[year_col].astype(str).str.contains(keyword, na=False)]
+                
+                # 2. 연도가 숫자로 변환 가능한 행만 선택
+                def is_numeric_convertible(x):
+                    try:
+                        float(str(x))
+                        return True
+                    except (ValueError, TypeError):
+                        return False
+                
+                plot_data = plot_data[plot_data[year_col].apply(is_numeric_convertible)]
+                plot_data = plot_data[plot_data[acc_col].apply(is_numeric_convertible)]
+                
+                # 3. 데이터 타입 변환
                 plot_data[year_col] = plot_data[year_col].astype(int)
+                plot_data[acc_col] = plot_data[acc_col].astype(float)
             
             if len(plot_data) > 0:
-                fig = px.line(
-                    plot_data,
-                    x=year_col,
-                    y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
-                    title='연도별 평균 정답률 추이' if lang == 'ko' else 'Average Accuracy Trend by Year',
-                    markers=True,
-                    text='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)'
-                )
-                
-                fig.update_traces(
-                    texttemplate='%{text:.1f}%',
-                    textposition='top center',
-                    marker=dict(size=10, line=dict(width=2, color='black')),
-                    line=dict(width=3)
-                )
-                fig.update_layout(
-                    height=500,
-                    yaxis_title='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
-                    xaxis_title='출제 연도' if lang == 'ko' else 'Year',
-                    yaxis=dict(range=[0, 100])
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                try:
+                    fig = px.line(
+                        plot_data,
+                        x=year_col,
+                        y=acc_col,
+                        title='연도별 평균 정답률 추이' if lang == 'ko' else 'Average Accuracy Trend by Year',
+                        markers=True,
+                        text=acc_col
+                    )
+                    
+                    fig.update_traces(
+                        texttemplate='%{text:.1f}%',
+                        textposition='top center',
+                        marker=dict(size=10, line=dict(width=2, color='black')),
+                        line=dict(width=3)
+                    )
+                    fig.update_layout(
+                        height=500,
+                        yaxis_title='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
+                        xaxis_title='출제 연도' if lang == 'ko' else 'Year',
+                        yaxis=dict(range=[0, 100])
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.error(f"{'차트 생성 오류' if lang == 'ko' else 'Chart creation error'}: {str(e)}")
+                    with st.expander("🔍 " + ("디버깅 정보" if lang == 'ko' else "Debug Info")):
+                        st.write("**필터링된 데이터:**")
+                        st.dataframe(plot_data)
             else:
                 st.warning("연도 데이터가 충분하지 않습니다." if lang == 'ko' else "Insufficient year data.")
             

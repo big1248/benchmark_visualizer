@@ -2159,7 +2159,7 @@ def main():
                 xaxis_title=t['model'],
                 yaxis=dict(range=[0, 100])
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         with col2:
             # 법령/비법령 정답률 비교 차트
@@ -2219,7 +2219,7 @@ def main():
                         x=1
                     )
                 )
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
             else:
                 # 법령 정보가 없을 때 - 모델별 정답/오답 수 차트
                 model_correct_wrong = filtered_df.groupby('모델')['정답여부'].agg(['sum', 'count']).reset_index()
@@ -2247,7 +2247,7 @@ def main():
                     yaxis_title='문제 수',
                     xaxis_title='모델'
                 )
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
         
         # 테스트셋별 분포 (여러 테스트가 있을 경우)
         if '테스트명' in filtered_df.columns and filtered_df['테스트명'].nunique() > 1:
@@ -2287,7 +2287,7 @@ def main():
                     xaxis_title='테스트명' if lang == 'ko' else 'Test Name'
                 )
                 fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
             
             with col2:
                 # 테스트셋별 평균 정확도
@@ -2319,7 +2319,7 @@ def main():
                     yaxis=dict(range=[0, 100])
                 )
                 fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
         
         # 종합 인사이트
         st.markdown("---")
@@ -2418,7 +2418,7 @@ def main():
                 yaxis_title=t['accuracy'] + ' (%)',
                 xaxis_title=t['model']
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         with col2:
             # 정답/오답 스택 바 차트
@@ -2447,7 +2447,7 @@ def main():
                 yaxis_title=t['problem_count'],
                 xaxis_title=t['model']
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         # 히트맵
         if '테스트명' in filtered_df.columns:
@@ -2475,7 +2475,7 @@ def main():
             fig.update_layout(height=400)
             fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
             fig.update_yaxes(tickfont=dict(size=annotation_size))
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
             
             # 히트맵 인사이트
             st.info(f"""
@@ -2605,7 +2605,7 @@ def main():
                         yaxis_title=t['response_time'] + ' (' + t['seconds'] + ')',
                         xaxis_title=t['model']
                     )
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, use_container_width=True)
                 
                 with col2:
                     # 박스플롯
@@ -2623,7 +2623,7 @@ def main():
                         xaxis_title=t['model']
                     )
                     fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, use_container_width=True)
                 
                 st.markdown("---")
                 
@@ -2650,7 +2650,7 @@ def main():
                     )
                 )
                 fig.update_layout(height=500)
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
                 
                 # 인사이트 개선
                 speed_accuracy_ratio = fastest['정확도'] / slowest['정확도'] if slowest['정확도'] > 0 else 0
@@ -2697,7 +2697,7 @@ def main():
                         yaxis_title=t['response_time'] + ' (' + t['seconds'] + ')'
                     )
                     fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, use_container_width=True)
                     
                     # 테스트별 인사이트
                     hardest_test = test_time.groupby('테스트명')['평균시간'].mean().idxmax()
@@ -2758,7 +2758,7 @@ def main():
                     title=t['law_distribution_stat'],
                     height=400
                 )
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
             
             with col2:
                 # 수치 표시
@@ -2823,7 +2823,7 @@ def main():
                 yaxis_title=t['accuracy'] + ' (%)',
                 xaxis_title=t['model']
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
             
             # 법령/비법령 성능 인사이트
             # 법령에 강한 모델과 비법령에 강한 모델 찾기
@@ -2914,7 +2914,7 @@ def main():
                     xaxis_title=t['by_subject'].replace('별', '')
                 )
                 fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
             
             # 모델별 과목 성능 히트맵 (셀 경계선 추가)
             st.markdown("---")
@@ -2936,7 +2936,7 @@ def main():
             fig.update_layout(height=400)
             fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
             fig.update_yaxes(tickfont=dict(size=annotation_size))
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
             
             # 과목별 성능 인사이트
             # 과목별 평균 정확도
@@ -3052,7 +3052,7 @@ def main():
                         yaxis_title=t['accuracy'] + ' (%)',
                         xaxis_title=t['year']
                     )
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, use_container_width=True)
                 
                 # 연도별 문제 수 차트 추가
                 st.markdown("---")
@@ -3130,7 +3130,7 @@ def main():
                         xaxis_title=t['year'],
                         xaxis=dict(tickmode='linear')
                     )
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, use_container_width=True)
                 
                 # 모델별 연도 성능 히트맵
                 st.markdown("---")
@@ -3155,7 +3155,7 @@ def main():
                 fig.update_layout(height=400)
                 fig.update_xaxes(tickfont=dict(size=annotation_size))
                 fig.update_yaxes(tickfont=dict(size=annotation_size))
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
                 
                 # 연도별 성능 인사이트
                 year_avg = year_model_pivot.mean(axis=0).sort_values()
@@ -3686,7 +3686,7 @@ def main():
                     yaxis_title='문제 수',
                     height=400
                 )
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
             
             with col2:
                 if 'Subject' in consistent_df.columns:
@@ -3704,7 +3704,7 @@ def main():
                     fig.update_traces(marker_line_color='black', marker_line_width=1.5)
                     fig.update_layout(height=400)
                     fig.update_xaxes(tickangle=45)
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, use_container_width=True)
             
             # 탭으로 100% / 50-99% 구분
             tab1, tab2 = st.tabs([
@@ -3912,7 +3912,7 @@ def main():
                 )
                 fig.update_traces(textposition='outside', marker_line_color='black', marker_line_width=1.5)
                 fig.update_layout(height=400)
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
             
             with col2:
                 fig = px.scatter(
@@ -3926,7 +3926,7 @@ def main():
                 )
                 fig.update_traces(textposition='top center', marker=dict(line=dict(width=2, color='black')))
                 fig.update_layout(height=400)
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
             
             st.dataframe(
                 prompt_comp_df.style.format({
@@ -3991,7 +3991,7 @@ def main():
                 height=max(400, len(models) * 40)
             )
             fig.update_xaxes(tickangle=45)
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
             
             agreement_pairs = []
             for i, model1 in enumerate(models):
@@ -4052,7 +4052,7 @@ def main():
                     fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside', marker_line_color='black', marker_line_width=1.5)
                     fig.update_layout(height=400, yaxis_title='공통 오답 비율 (%)')
                     fig.update_xaxes(tickangle=45)
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, use_container_width=True)
             
             with col2:
                 if 'Year' in all_wrong.columns:
@@ -4074,7 +4074,7 @@ def main():
                         )
                         fig.update_traces(textposition='top center', marker_size=10, marker_line_color='black', marker_line_width=2, line_width=3)
                         fig.update_layout(height=400, xaxis_title='연도', yaxis_title='문제 수')
-                        st.plotly_chart(fig, width='stretch')
+                        st.plotly_chart(fig, use_container_width=True)
         
         # ========================================
         # 섹션 6: Top 20 오답률 높은 문제
@@ -4282,7 +4282,7 @@ def main():
                 )
                 fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside', marker_line_color='black', marker_line_width=1.5)
                 fig.update_layout(height=400, yaxis_title='공통 오답 비율 (%)')
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
             
             with col2:
                 # 법령/비법령별 평균 오답률
@@ -4301,7 +4301,7 @@ def main():
                 )
                 fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside', marker_line_color='black', marker_line_width=1.5)
                 fig.update_layout(height=400, yaxis_title='평균 오답률 (%)', yaxis=dict(range=[0, 100]))
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
             
             # 법령 문제 중 완전 공통 오답
             st.markdown("#### 📜 " + ("법령 문제 중 완전 공통 오답" if lang == 'ko' else "Law Problems - Complete Gap"))
@@ -4457,7 +4457,7 @@ def main():
             yaxis=dict(range=[0, 1])
         )
         fig.update_xaxes(tickangle=45)
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     
     # 탭 8: 난이도 분석
     with tabs[7]:
@@ -4541,7 +4541,7 @@ def main():
                 marker_line_width=1.5
             )
             fig.update_layout(height=400)
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         with col2:
             # 난이도 구간별 문제 수
@@ -4569,7 +4569,7 @@ def main():
                 showlegend=False
             )
             fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         # 통계 요약
         col1, col2, col3, col4 = st.columns(4)
@@ -4644,7 +4644,7 @@ def main():
         )
         fig.update_layout(height=500)
         fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
         
         # 히트맵
         pivot_difficulty = model_difficulty.pivot(
@@ -4676,7 +4676,7 @@ def main():
         )
         fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
         fig.update_yaxes(tickfont=dict(size=annotation_size))
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
         
         # 난이도별 성능 인사이트
         # 모델별 난이도 적응력 분석
@@ -4754,7 +4754,7 @@ def main():
                 height=500,
                 showlegend=False
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
             
             # 과목 × 난이도 구간 히트맵
             subject_diff_dist = analysis_df.groupby(['Subject', '난이도_구간']).size().reset_index(name='문제수')
@@ -4787,7 +4787,7 @@ def main():
             )
             fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
             fig.update_yaxes(tickfont=dict(size=annotation_size))
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         st.markdown("---")
         
@@ -5115,7 +5115,7 @@ def main():
                             xaxis_title=t['model']
                         )
                         fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-                        st.plotly_chart(fig, width='stretch')
+                        st.plotly_chart(fig, use_container_width=True)
                 
                 with col2:
                     # 입출력 토큰 비교
@@ -5146,7 +5146,7 @@ def main():
                             xaxis_title=t['model']
                         )
                         fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-                        st.plotly_chart(fig, width='stretch')
+                        st.plotly_chart(fig, use_container_width=True)
                 
                 st.markdown("---")
                 
@@ -5180,7 +5180,7 @@ def main():
                             xaxis_title=t['model']
                         )
                         fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-                        st.plotly_chart(fig, width='stretch')
+                        st.plotly_chart(fig, use_container_width=True)
                     
                     with col2:
                         # 토큰 vs 정확도 산점도
@@ -5205,7 +5205,7 @@ def main():
                                 )
                             )
                             fig.update_layout(height=400)
-                            st.plotly_chart(fig, width='stretch')
+                            st.plotly_chart(fig, use_container_width=True)
                 
                 st.markdown("---")
                 
@@ -5439,7 +5439,7 @@ def main():
                                     xaxis_title=t['model']
                                 )
                                 fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-                                st.plotly_chart(fig, width='stretch')
+                                st.plotly_chart(fig, use_container_width=True)
                             
                             with col2:
                                 # 정답당 비용 (효율성)
@@ -5465,7 +5465,7 @@ def main():
                                     xaxis_title=t['model']
                                 )
                                 fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-                                st.plotly_chart(fig, width='stretch')
+                                st.plotly_chart(fig, use_container_width=True)
                             
                             st.markdown("---")
                             
@@ -5491,7 +5491,7 @@ def main():
                                 height=500,
                                 yaxis=dict(range=[0, 100])
                             )
-                            st.plotly_chart(fig, width='stretch')
+                            st.plotly_chart(fig, use_container_width=True)
                             
                             # 인사이트
                             st.success(f"""
@@ -5531,7 +5531,7 @@ def main():
                             marker=dict(line=dict(color='black', width=2))
                         )
                         fig.update_layout(height=400)
-                        st.plotly_chart(fig, width='stretch')
+                        st.plotly_chart(fig, use_container_width=True)
                     
                     with col2:
                         # 비용 수준별 평균 정확도
@@ -5570,7 +5570,7 @@ def main():
                                 categoryarray=cost_order
                             )
                         )
-                        st.plotly_chart(fig, width='stretch')
+                        st.plotly_chart(fig, use_container_width=True)
                     
                     st.markdown("---")
                     
@@ -5615,7 +5615,7 @@ def main():
                             ),
                             yaxis_title=t['accuracy'] + ' (%)'
                         )
-                        st.plotly_chart(fig, width='stretch')
+                        st.plotly_chart(fig, use_container_width=True)
                         
                         # 인사이트
                         st.info(f"""
@@ -5650,7 +5650,7 @@ def main():
                         yaxis_title=t['total_tokens']
                     )
                     fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, use_container_width=True)
                 
                 st.markdown("---")
                 
@@ -5689,7 +5689,7 @@ def main():
                             xaxis_title=t['model']
                         )
                         fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-                        st.plotly_chart(fig, width='stretch')
+                        st.plotly_chart(fig, use_container_width=True)
                     
                     with col2:
                         # 문제 유형별 정확도 비교
@@ -5708,7 +5708,7 @@ def main():
                             yaxis=dict(range=[0, 100])
                         )
                         fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-                        st.plotly_chart(fig, width='stretch')
+                        st.plotly_chart(fig, use_container_width=True)
     
     # 탭 10: 테스트셋 통계
     with tabs[9]:
@@ -5793,7 +5793,7 @@ def main():
                                 fig = px.bar(subject_df, x='Subject', y='Count', 
                                            title=t['subject_distribution'])
                                 fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
-                                st.plotly_chart(fig, width='stretch')
+                                st.plotly_chart(fig, use_container_width=True)
                         
                         with col2:
                             if 'by_year' in stats:
@@ -5802,7 +5802,7 @@ def main():
                                                       columns=['Year', 'Count'])
                                 fig = px.bar(year_df, x='Year', y='Count', 
                                            title=t['year_distribution'])
-                                st.plotly_chart(fig, width='stretch')
+                                st.plotly_chart(fig, use_container_width=True)
                         
                         with col3:
                             if 'by_session' in stats:
@@ -5811,7 +5811,7 @@ def main():
                                                          columns=['Session', 'Count'])
                                 fig = px.bar(session_df, x='Session', y='Count', 
                                            title=t['session_distribution'])
-                                st.plotly_chart(fig, width='stretch')
+                                st.plotly_chart(fig, use_container_width=True)
                     
                     st.markdown("---")
         else:
@@ -5874,7 +5874,7 @@ def main():
                 yaxis=dict(range=[0, 100])
             )
             fig.update_xaxes(tickangle=45)
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("테스트셋 데이터가 없습니다." if lang == 'ko' else "No test set data available.")
         
@@ -5937,7 +5937,7 @@ def main():
                 )
             )
             fig.update_xaxes(tickangle=45)
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
             
             # 정답률 차이 막대 그래프
             st.markdown("#### " + ("정답률 차이 (법령 - 비법령)" if lang == 'ko' else "Accuracy Difference (Law - Non-Law)"))
@@ -5963,7 +5963,7 @@ def main():
                 xaxis_title='테스트명' if lang == 'ko' else 'Test Name'
             )
             fig2.update_xaxes(tickangle=45)
-            st.plotly_chart(fig2, width='stretch')
+            st.plotly_chart(fig2, use_container_width=True)
             
             # 인사이트 표시
             avg_diff = table2['정답률 차이 (법령-비법령)' if lang == 'ko' else 'Accuracy Diff (Law-NonLaw)'].mean()
@@ -6117,33 +6117,46 @@ def main():
             yaxis=dict(range=[0, 100])
         )
         fig.update_xaxes(tickangle=45)
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
         
         st.markdown("---")
         
         # Figure 2: 테스트셋별 정답률 박스플롯 (NEW!)
-        if '테스트명' in filtered_df.columns:
+        if '테스트명' in filtered_df.columns and '정답여부' in filtered_df.columns:
             st.subheader("📦 " + ("Figure 2: 테스트셋별 정답률 박스플롯" if lang == 'ko' else "Figure 2: Accuracy Distribution by Test Set"))
             
+            # 모델별, 테스트별 정답률 계산
+            test_model_acc = filtered_df.groupby(['테스트명', '모델'])['정답여부'].mean().reset_index()
+            test_model_acc['정답률'] = test_model_acc['정답여부'] * 100
+            
+            # 디버깅 정보 (펼치기/접기)
+            with st.expander("🔍 " + ("디버깅 정보" if lang == 'ko' else "Debug Info")):
+                st.write("**정답률 범위:**", f"{test_model_acc['정답률'].min():.2f}% ~ {test_model_acc['정답률'].max():.2f}%")
+                st.write("**데이터 샘플:**")
+                st.dataframe(test_model_acc.head(10))
+            
             fig = px.box(
-                filtered_df,
+                test_model_acc,
                 x='테스트명',
-                y=filtered_df['정답여부'] * 100,  # 0/1을 %로 변환
-                title='테스트셋별 정답률 분포' if lang == 'ko' else 'Accuracy Distribution by Test Set',
+                y='정답률',
+                title='테스트셋별 정답률 분포 (모델별)' if lang == 'ko' else 'Accuracy Distribution by Test Set (per Model)',
                 labels={
-                    'x': '테스트명' if lang == 'ko' else 'Test Name',
-                    'y': '정답률 (%)' if lang == 'ko' else 'Accuracy (%)'
-                }
+                    '테스트명': '테스트명' if lang == 'ko' else 'Test Name',
+                    '정답률': '정답률 (%)' if lang == 'ko' else 'Accuracy (%)'
+                },
+                color='테스트명',
+                points='all'  # 모든 데이터 포인트 표시
             )
             
             fig.update_layout(
                 height=500,
                 yaxis_title='정답률 (%)' if lang == 'ko' else 'Accuracy (%)',
                 xaxis_title='테스트명' if lang == 'ko' else 'Test Name',
-                yaxis=dict(range=[0, 100])
+                yaxis=dict(range=[0, 100]),
+                showlegend=False
             )
             fig.update_xaxes(tickangle=45)
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
             
             st.markdown("---")
         
@@ -6173,7 +6186,7 @@ def main():
                 yaxis_title='모델' if lang == 'ko' else 'Model'
             )
             fig.update_xaxes(tickangle=45)
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
             
             st.markdown("---")
         
@@ -6181,18 +6194,28 @@ def main():
         if table4 is not None and len(table4) > 0:
             st.subheader("⚡ " + ("Figure 5: 응답 시간-정답률 산점도" if lang == 'ko' else "Figure 5: Response Time vs Accuracy"))
             
+            # 산점도 생성 (size 제거 - 파라미터 수로 색상 표현)
             fig = px.scatter(
                 table4,
                 x='평균 응답시간 (초)' if lang == 'ko' else 'Avg Response Time (s)',
                 y='정답률 (%)' if lang == 'ko' else 'Accuracy (%)',
                 text='모델명' if lang == 'ko' else 'Model',
+                color='파라미터 수 (B)' if lang == 'ko' else 'Parameters (B)',
                 title='응답 시간 vs 정확도' if lang == 'ko' else 'Response Time vs Accuracy',
-                size='문제수' if lang == 'ko' else 'Problem Count' if '문제수' in table4.columns or 'Problem Count' in table4.columns else None
+                color_continuous_scale='Viridis'
             )
             
-            fig.update_traces(textposition='top center', marker=dict(size=12))
-            fig.update_layout(height=500)
-            st.plotly_chart(fig, width='stretch')
+            fig.update_traces(
+                textposition='top center',
+                marker=dict(size=15, line=dict(width=1.5, color='black'))
+            )
+            fig.update_layout(
+                height=500,
+                yaxis=dict(range=[0, 100])
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            st.info("💡 " + ("왼쪽 위(빠른 시간 + 높은 정확도)가 가장 효율적입니다." if lang == 'ko' else "Top left (fast time + high accuracy) is most efficient."))
             
             st.markdown("---")
         
@@ -6238,7 +6261,7 @@ def main():
                 yaxis=dict(range=[0, 100])
             )
             fig.update_xaxes(tickangle=45)
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
             
             st.markdown("---")
         
@@ -6267,7 +6290,7 @@ def main():
                 xaxis_title='출제 연도' if lang == 'ko' else 'Year',
                 yaxis=dict(range=[0, 100])
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
             
             st.markdown("---")
         
@@ -6329,7 +6352,7 @@ def main():
                     ticktext=ticktext
                 )
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         # Figure 8: 난이도별 레이더 차트
         if '정답여부' in filtered_df.columns:
@@ -6383,7 +6406,7 @@ def main():
                     height=600
                 )
                 
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("레이더 차트를 생성할 데이터가 부족합니다." if lang == 'ko' else "Insufficient data for radar chart.")
         
@@ -6410,7 +6433,7 @@ def main():
                 marker=dict(size=12, line=dict(width=2, color='black'))
             )
             fig.update_layout(height=500)
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
             
             st.info("💡 " + ("왼쪽 위(낮은 비용 + 높은 정확도)가 가장 효율적입니다." if lang == 'ko' else "Top left (low cost + high accuracy) is most efficient."))
             
@@ -6428,7 +6451,7 @@ def main():
             )
             fig.update_traces(textposition='inside', textinfo='percent+label')
             fig.update_layout(height=500)
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         # Figure 11: 모델별 오답 일치도 히트맵
         st.subheader("🔥 " + ("Figure 11: 모델별 오답 일치도 히트맵" if lang == 'ko' else "Figure 11: Model Error Agreement Heatmap"))
@@ -6498,7 +6521,7 @@ def main():
             )
             fig.update_xaxes(tickangle=45)
             
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("모델이 2개 이상 필요합니다." if lang == 'ko' else "At least 2 models required.")
         
@@ -6561,7 +6584,7 @@ def main():
                 showlegend=False
             )
             
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
             
             st.markdown("---")
             
@@ -6591,7 +6614,7 @@ def main():
                 yaxis_title='모델' if lang == 'ko' else 'Model'
             )
             
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
             
             # 인사이트
             st.success("💡 " + ("SafetyQ&A는 전문 영역(안전/법령) 벤치마크로, 범용 벤치마크(MMLU, GPQA)와 다른 패턴을 보입니다." if lang == 'ko' else "SafetyQ&A is a specialized benchmark (safety/law) showing different patterns from general benchmarks (MMLU, GPQA)."))

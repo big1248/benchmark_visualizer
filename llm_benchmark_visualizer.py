@@ -6269,28 +6269,40 @@ def main():
         if table6 is not None and len(table6) > 0:
             st.subheader("📈 " + ("Figure 7: 출제 연도별 정답률 추이" if lang == 'ko' else "Figure 7: Accuracy Trend by Year"))
             
-            fig = px.line(
-                table6,
-                x='연도' if lang == 'ko' else 'Year',
-                y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
-                title='연도별 평균 정답률 추이' if lang == 'ko' else 'Average Accuracy Trend by Year',
-                markers=True,
-                text='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)'
-            )
+            # 상관계수, p-value 행 제거 (연도가 숫자가 아닌 행)
+            year_col = '연도' if lang == 'ko' else 'Year'
+            plot_data = table6.copy()
             
-            fig.update_traces(
-                texttemplate='%{text:.1f}%',
-                textposition='top center',
-                marker_size=10,
-                line_width=3
-            )
-            fig.update_layout(
-                height=500,
-                yaxis_title='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
-                xaxis_title='출제 연도' if lang == 'ko' else 'Year',
-                yaxis=dict(range=[0, 100])
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            # 연도가 숫자인 행만 필터링
+            if year_col in plot_data.columns:
+                plot_data = plot_data[plot_data[year_col].apply(lambda x: str(x).replace('.', '').isdigit())]
+                plot_data[year_col] = plot_data[year_col].astype(int)
+            
+            if len(plot_data) > 0:
+                fig = px.line(
+                    plot_data,
+                    x=year_col,
+                    y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
+                    title='연도별 평균 정답률 추이' if lang == 'ko' else 'Average Accuracy Trend by Year',
+                    markers=True,
+                    text='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)'
+                )
+                
+                fig.update_traces(
+                    texttemplate='%{text:.1f}%',
+                    textposition='top center',
+                    marker=dict(size=10, line=dict(width=2, color='black')),
+                    line=dict(width=3)
+                )
+                fig.update_layout(
+                    height=500,
+                    yaxis_title='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
+                    xaxis_title='출제 연도' if lang == 'ko' else 'Year',
+                    yaxis=dict(range=[0, 100])
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.warning("연도 데이터가 충분하지 않습니다." if lang == 'ko' else "Insufficient year data.")
             
             st.markdown("---")
         
@@ -6298,61 +6310,78 @@ def main():
         if table3 is not None and len(table3) > 0:
             st.subheader("📅 " + ("Figure 4: 출시 시기-성능 추이" if lang == 'ko' else "Figure 4: Release Date vs Performance"))
             
-            # 추세선 그리기 시도 (statsmodels 필요)
+            # 날짜를 숫자로 변환 (YYYY-MM -> YYYYMM)
+            table3_plot = table3.copy()
+            date_col = '출시 시기' if lang == 'ko' else 'Release Date'
+            
             try:
-                fig = px.scatter(
-                    table3_copy,
-                    x='date_numeric',
-                    y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
-                    text='모델명' if lang == 'ko' else 'Model',
-                    title='모델 출시 시기와 성능 관계 (추세선 포함)' if lang == 'ko' else 'Model Release Date vs Performance (with Trendline)',
-                    trendline='ols',
-                    labels={'date_numeric': '출시 시기' if lang == 'ko' else 'Release Date'}
-                )
-                use_trendline = True
-            except (ImportError, ModuleNotFoundError):
-                # statsmodels가 없으면 추세선 없이 그리기
-                fig = px.scatter(
-                    table3_copy,
-                    x='date_numeric',
-                    y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
-                    text='모델명' if lang == 'ko' else 'Model',
-                    title='모델 출시 시기와 성능 관계' if lang == 'ko' else 'Model Release Date vs Performance',
-                    labels={'date_numeric': '출시 시기' if lang == 'ko' else 'Release Date'}
+                table3_plot['date_numeric'] = table3_plot[date_col].str.replace('-', '').astype(int)
+            except:
+                st.warning("날짜 형식 변환 오류" if lang == 'ko' else "Date format conversion error")
+                st.markdown("---")
+                # Figure 8로 건너뛰기
+            else:
+                # 추세선 그리기 시도 (statsmodels 필요)
+                try:
+                    fig = px.scatter(
+                        table3_plot,
+                        x='date_numeric',
+                        y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
+                        text='모델명' if lang == 'ko' else 'Model',
+                        title='모델 출시 시기와 성능 관계 (추세선 포함)' if lang == 'ko' else 'Model Release Date vs Performance (with Trendline)',
+                        trendline='ols',
+                        labels={'date_numeric': '출시 시기' if lang == 'ko' else 'Release Date'}
+                    )
+                    use_trendline = True
+                except (ImportError, ModuleNotFoundError, Exception):
+                    # statsmodels가 없거나 오류 발생 시 추세선 없이 그리기
+                    fig = px.scatter(
+                        table3_plot,
+                        x='date_numeric',
+                        y='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
+                        text='모델명' if lang == 'ko' else 'Model',
+                        title='모델 출시 시기와 성능 관계' if lang == 'ko' else 'Model Release Date vs Performance',
+                        labels={'date_numeric': '출시 시기' if lang == 'ko' else 'Release Date'}
+                    )
+                    
+                    # 수동으로 간단한 추세선 추가
+                    x_numeric = table3_plot['date_numeric'].values
+                    y_values = table3_plot['평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)'].values
+                    
+                    # 선형 회귀 계산
+                    z = np.polyfit(x_numeric, y_values, 1)
+                    p = np.poly1d(z)
+                    
+                    # 추세선 추가
+                    fig.add_scatter(
+                        x=x_numeric,
+                        y=p(x_numeric),
+                        mode='lines',
+                        name='추세선' if lang == 'ko' else 'Trend',
+                        line=dict(color='red', dash='dash')
+                    )
+                    use_trendline = False
+                
+                # X축 레이블을 원래 날짜 형식으로 변경
+                tickvals = sorted(table3_plot['date_numeric'].unique())
+                ticktext = [f"{str(val)[:4]}-{str(val)[4:]}" for val in tickvals]
+                
+                fig.update_traces(textposition='top center', marker=dict(size=10, line=dict(width=2, color='black')), selector=dict(mode='markers'))
+                fig.update_layout(
+                    height=500,
+                    xaxis=dict(
+                        tickmode='array',
+                        tickvals=tickvals,
+                        ticktext=ticktext,
+                        tickangle=45
+                    ),
+                    yaxis_title='평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)',
+                    yaxis=dict(range=[0, 100])
                 )
                 
-                # 수동으로 간단한 추세선 추가 (numpy는 이미 상단에서 import됨)
-                x_numeric = table3_copy['date_numeric'].values
-                y_values = table3_copy['평균 정답률 (%)' if lang == 'ko' else 'Avg Accuracy (%)'].values
+                st.plotly_chart(fig, use_container_width=True)
                 
-                # 선형 회귀 계산
-                z = np.polyfit(x_numeric, y_values, 1)
-                p = np.poly1d(z)
-                
-                # 추세선 추가
-                fig.add_scatter(
-                    x=x_numeric,
-                    y=p(x_numeric),
-                    mode='lines',
-                    name='추세선' if lang == 'ko' else 'Trend',
-                    line=dict(color='red', dash='dash')
-                )
-                use_trendline = False
-            
-            # X축 레이블을 원래 날짜 형식으로 변경
-            tickvals = sorted(table3_copy['date_numeric'].unique())
-            ticktext = [f"{str(val)[:4]}-{str(val)[4:]}" for val in tickvals]
-            
-            fig.update_traces(textposition='top center', marker=dict(size=10), selector=dict(mode='markers'))
-            fig.update_layout(
-                height=500,
-                xaxis=dict(
-                    tickmode='array',
-                    tickvals=tickvals,
-                    ticktext=ticktext
-                )
-            )
-            st.plotly_chart(fig, use_container_width=True)
+                st.markdown("---")
         
         # Figure 8: 난이도별 레이더 차트
         if '정답여부' in filtered_df.columns:

@@ -5039,27 +5039,36 @@ def main():
                     
                     # 모델별 API 가격 정의 (2024-2025 기준, USD per 1M tokens)
                     MODEL_PRICING = {
-                        # OpenAI
-                        'GPT-4o': {'input': 2.50, 'output': 10.00},
+                        # OpenAI (2025년 11월 기준, per 1M tokens)
+                        'GPT-4o': {'input': 5.00, 'output': 15.00},  # 2025년 업데이트
                         'GPT-4o-Mini': {'input': 0.150, 'output': 0.600},
                         'GPT-4-Turbo': {'input': 10.00, 'output': 30.00},
                         'GPT-3.5-Turbo': {'input': 0.50, 'output': 1.50},
-                        # Anthropic
-                        'Claude-3.5-Sonnet': {'input': 3.00, 'output': 15.00},
+                        # Anthropic (2025년 11월 기준, per 1M tokens)
+                        'Claude-Opus-4.5': {'input': 5.00, 'output': 25.00},  # 2025년 11월 출시
+                        'Claude-Sonnet-4.5': {'input': 3.00, 'output': 15.00},  # 2025년 10월 출시
                         'Claude-Sonnet-4': {'input': 3.00, 'output': 15.00},
+                        'Claude-Haiku-4.5': {'input': 1.00, 'output': 5.00},  # 2025년 11월 출시 (업데이트됨!)
+                        'Claude-3.5-Sonnet': {'input': 3.00, 'output': 15.00},
                         'Claude-3.5-Haiku': {'input': 0.80, 'output': 4.00},
                         'Claude-3-Opus': {'input': 15.00, 'output': 75.00},
                         'Claude-3-Sonnet': {'input': 3.00, 'output': 15.00},
                         'Claude-3-Haiku': {'input': 0.25, 'output': 1.25},
-                        # Google
+                        # Google (2025년 기준, per 1M tokens)
                         'Gemini-1.5-Pro': {'input': 1.25, 'output': 5.00},
                         'Gemini-1.5-Flash': {'input': 0.075, 'output': 0.30},
+                        # Alibaba (오픈소스)
+                        'Qwen-2.5': {'input': 0.00, 'output': 0.00},  # 오픈소스/로컬
+                        'Qwen2.5': {'input': 0.00, 'output': 0.00},  # 오픈소스/로컬
                         # LG AI Research
                         'EXAONE-3.5': {'input': 0.00, 'output': 0.00},  # 로컬/무료
+                        # Meta
+                        'Llama-3.3': {'input': 0.00, 'output': 0.00},  # 오픈소스/로컬
+                        'Llama-3': {'input': 0.00, 'output': 0.00},  # 오픈소스/로컬
                     }
                     
                     # 가격 정보 표시
-                    with st.expander("📋 " + ("모델별 API 가격 정보 (2024-2025)" if lang == 'ko' else "API Pricing by Model (2024-2025)")):
+                    with st.expander("📋 " + ("모델별 API 가격 정보 (2025년 11월 기준)" if lang == 'ko' else "API Pricing by Model (November 2025)")):
                         pricing_data = []
                         for model, prices in MODEL_PRICING.items():
                             pricing_data.append({
@@ -5069,6 +5078,7 @@ def main():
                             })
                         st.dataframe(pd.DataFrame(pricing_data), width='stretch')
                         st.caption("💡 " + ("가격은 변동될 수 있습니다. 최신 가격은 각 제공업체 웹사이트를 확인하세요." if lang == 'ko' else "Prices may vary. Check provider websites for latest pricing."))
+                        st.caption("📅 " + ("업데이트: 2025년 11월 (Claude Opus 4.5, Sonnet 4.5, Haiku 4.5 포함)" if lang == 'ko' else "Updated: November 2025 (includes Claude Opus 4.5, Sonnet 4.5, Haiku 4.5)"))
                     
                     # 실제 비용 계산
                     if '총_입력토큰' in model_token_stats.columns and '총_출력토큰' in model_token_stats.columns:

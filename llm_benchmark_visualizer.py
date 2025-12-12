@@ -9,11 +9,12 @@ from pathlib import Path
 import numpy as np
 from scipy import stats
 import io
-
-import streamlit as st
 import requests
 import zipfile
-import os
+import gc
+import re
+from collections import Counter
+from functools import lru_cache
 
 @st.cache_data(ttl=86400)
 def download_data_from_github():
@@ -21,8 +22,8 @@ def download_data_from_github():
     
     data_dir = Path('./data')
     
-    # 이미 있으면 스킵
-    if data_dir.exists() and len(list(data_dir.glob('*.csv'))) > 0:
+    # 이미 있으면 스킵 (효율적인 존재 확인)
+    if data_dir.exists() and next(data_dir.glob('*.csv'), None) is not None:
         return
     
     try:
@@ -35,25 +36,24 @@ def download_data_from_github():
         tag = "v2.2.0"
         url = f"https://github.com/{repo}/releases/download/{tag}/data.zip"
         
-        # 다운로드
+        # 스트리밍 다운로드 (메모리 효율적)
         st.info("📥 데이터 다운로드 중...")
-        response = requests.get(url, timeout=60)
-        response.raise_for_status()
-        
-        # 저장 및 압축 해제
-        with open('data.zip', 'wb') as f:
-            f.write(response.content)
+        with requests.get(url, timeout=60, stream=True) as response:
+            response.raise_for_status()
+            with open('data.zip', 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
         
         with zipfile.ZipFile('data.zip', 'r') as zip_ref:
             zip_ref.extractall('.')
         
         os.remove('data.zip')
         
-        # 검증
+        # 검증 (효율적인 카운트)
         if not data_dir.exists():
             raise Exception("data 폴더가 생성되지 않았습니다")
         
-        csv_count = len(list(data_dir.glob('*.csv')))
+        csv_count = sum(1 for _ in data_dir.glob('*.csv'))
         if csv_count == 0:
             raise Exception("CSV 파일이 없습니다")
         
@@ -476,10 +476,19 @@ def apply_custom_css(font_size_multiplier=1.0):
     </style>
     """, unsafe_allow_html=True)
 
-# Plotly 차트 글로벌 폰트 크기 설정
+# Plotly 차트 글로벌 폰트 크기 설정 (캐싱으로 불필요한 재생성 방지)
+_plotly_template_cache = {}
+
 def set_plotly_font_size(chart_text_multiplier=1.0):
-    """모든 Plotly 차트에 적용될 기본 폰트 크기 설정"""
+    """모든 Plotly 차트에 적용될 기본 폰트 크기 설정 (캐싱 적용)"""
     import plotly.io as pio
+    
+    # 캐시 키 생성
+    cache_key = round(chart_text_multiplier, 2)
+    
+    # 이미 동일한 설정이 적용되어 있으면 스킵
+    if _plotly_template_cache.get('last_multiplier') == cache_key:
+        return int(12 * chart_text_multiplier)
     
     # 기본 폰트 크기 계산
     title_size = int(20 * chart_text_multiplier)
@@ -505,6 +514,9 @@ def set_plotly_font_size(chart_text_multiplier=1.0):
     
     # 기본 템플릿으로 설정
     pio.templates.default = "custom"
+    
+    # 캐시 업데이트
+    _plotly_template_cache['last_multiplier'] = cache_key
     
     return int(12 * chart_text_multiplier)  # 히트맵용 크기 반환
 
@@ -844,11 +856,15 @@ def create_year_correlation_table(filtered_df, lang='ko'):
     if 'Year' not in filtered_df.columns:
         return None
     
-    filtered_df['Year_Int'] = filtered_df['Year'].apply(safe_convert_to_int)
-    year_df = filtered_df[filtered_df['Year_Int'].notna()].copy()
+    # 벡터화된 연도 변환 (copy 최소화)
+    year_int_series = filtered_df['Year'].apply(safe_convert_to_int)
+    valid_mask = year_int_series.notna()
     
-    if len(year_df) == 0:
+    if not valid_mask.any():
         return None
+    
+    # 필요한 컬럼만 선택하여 메모리 절약
+    year_df = filtered_df.loc[valid_mask, ['Question', '정답여부']].assign(Year_Int=year_int_series[valid_mask])
     
     # 연도별 통계
     year_stats = year_df.groupby('Year_Int').agg({
@@ -1100,8 +1116,8 @@ def create_difficulty_model_performance_table(filtered_df, lang='ko'):
         else:
             return '매우 쉬움' if lang == 'ko' else 'Very Easy'
     
-    filtered_df_copy = filtered_df.copy()
-    filtered_df_copy['difficulty_level'] = filtered_df_copy['Question'].map(
+    # 난이도 레벨을 Series로 생성 (copy 없이)
+    difficulty_levels = filtered_df['Question'].map(
         lambda q: classify_difficulty(difficulty.get(q, 50))
     )
     
@@ -1119,13 +1135,16 @@ def create_difficulty_model_performance_table(filtered_df, lang='ko'):
     
     results = []
     for model in top_models:
-        model_df = filtered_df_copy[filtered_df_copy['모델'] == model]
+        model_mask = filtered_df['모델'] == model
+        model_difficulty = difficulty_levels[model_mask]
+        model_correct = filtered_df.loc[model_mask, '정답여부']
         
         row = {'모델명' if lang == 'ko' else 'Model': model}
         
         for diff_level in difficulty_order:
-            diff_df = model_df[model_df['difficulty_level'] == diff_level]
-            acc = (diff_df['정답여부'].mean() * 100) if len(diff_df) > 0 else 0
+            diff_mask = model_difficulty == diff_level
+            diff_correct = model_correct[diff_mask]
+            acc = (diff_correct.mean() * 100) if len(diff_correct) > 0 else 0
             row[diff_level] = round(acc, 1)
         
         results.append(row)
@@ -1266,10 +1285,10 @@ def create_benchmark_comparison_table(filtered_df, lang='ko'):
     
     return df
 
-# 앙상블 모델 생성 함수
+# 앙상블 모델 생성 함수 (최적화 버전)
 def create_ensemble_model(base_df, ensemble_name, selected_model_names, method='majority'):
     """
-    여러 모델의 예측을 결합하여 앙상블 모델 데이터 생성
+    여러 모델의 예측을 결합하여 앙상블 모델 데이터 생성 (최적화 버전)
     
     Args:
         base_df: 원본 데이터프레임
@@ -1280,67 +1299,145 @@ def create_ensemble_model(base_df, ensemble_name, selected_model_names, method='
     Returns:
         ensemble_df: 앙상블 모델의 예측 결과 데이터프레임
     """
-    from collections import Counter
+    # 선택된 모델만 필터링 (한 번만 수행)
+    filtered_df = base_df[base_df['모델'].isin(selected_model_names)]
+    
+    if filtered_df.empty:
+        return pd.DataFrame()
+    
+    # 모델별 전체 정확도 계산 (가중 투표용) - 미리 계산
+    model_accuracy = {}
+    if method == 'weighted':
+        model_accuracy = filtered_df.groupby('모델')['정답여부'].mean().to_dict()
+    
+    # 문제별 모델 수 계산하여 모든 모델이 푼 문제만 선택
+    question_model_counts = filtered_df.groupby('Question')['모델'].nunique()
+    valid_questions = question_model_counts[question_model_counts == len(selected_model_names)].index
+    
+    if len(valid_questions) == 0:
+        return pd.DataFrame()
+    
+    # 유효한 문제만 필터링
+    valid_df = filtered_df[filtered_df['Question'].isin(valid_questions)]
     
     ensemble_rows = []
     
-    # 모델별 전체 정확도 계산 (가중 투표용)
-    if method == 'weighted':
-        model_accuracy = base_df.groupby('모델')['정답여부'].mean().to_dict()
-    
-    # 각 문제별로 앙상블 예측 계산
-    for question in base_df['Question'].unique():
-        q_df = base_df[(base_df['Question'] == question) & (base_df['모델'].isin(selected_model_names))]
-        
-        # 선택한 모든 모델이 해당 문제를 풀었는지 확인
-        if len(q_df) < len(selected_model_names):
-            continue
-        
-        # 대표 행 가져오기 (첫 번째 모델의 행을 기준으로)
-        base_row = q_df.iloc[0].copy()
+    # 문제별로 그룹화하여 처리 (groupby 사용으로 최적화)
+    for question, q_df in valid_df.groupby('Question'):
+        # 대표 행 가져오기
+        base_row = q_df.iloc[0].to_dict()
         
         # 앙상블 예측 계산
+        predictions = q_df['예측답'].tolist()
+        
         if method == 'majority':
             # 다수결 투표
-            predictions = q_df['예측답'].tolist()
-            if predictions:
-                counter = Counter(predictions)
-                ensemble_answer = counter.most_common(1)[0][0]
+            counter = Counter(predictions)
+            ensemble_answer = counter.most_common(1)[0][0]
         else:  # weighted
-            # 가중 투표
+            # 가중 투표 - 벡터화 처리 (iterrows 대신 zip 사용)
             answer_weights = {}
-            for _, row in q_df.iterrows():
-                answer = row['예측답']
-                model = row['모델']
+            for answer, model in zip(q_df['예측답'].values, q_df['모델'].values):
                 weight = model_accuracy.get(model, 0)
-                
-                if answer in answer_weights:
-                    answer_weights[answer] += weight
-                else:
-                    answer_weights[answer] = weight
+                answer_weights[answer] = answer_weights.get(answer, 0) + weight
             
-            if answer_weights:
-                ensemble_answer = max(answer_weights, key=answer_weights.get)
-            else:
-                ensemble_answer = None
+            ensemble_answer = max(answer_weights, key=answer_weights.get) if answer_weights else None
         
         # 앙상블 결과 행 생성
         if ensemble_answer is not None:
             base_row['모델'] = ensemble_name
             base_row['예측답'] = ensemble_answer
-            base_row['정답여부'] = (base_row['Answer'] == ensemble_answer) if pd.notna(base_row['Answer']) else False
-            
-            # 앙상블 메타 정보 추가
+            base_row['정답여부'] = (base_row.get('Answer') == ensemble_answer) if pd.notna(base_row.get('Answer')) else False
             base_row['상세도'] = 'ensemble'
             base_row['프롬프팅'] = method
-            
             ensemble_rows.append(base_row)
     
     if ensemble_rows:
-        ensemble_df = pd.DataFrame(ensemble_rows)
-        return ensemble_df
-    else:
-        return pd.DataFrame()
+        return pd.DataFrame(ensemble_rows)
+    return pd.DataFrame()
+
+
+# 모델명 포맷팅 함수 (캐싱으로 반복 호출 최적화)
+@lru_cache(maxsize=256)
+def format_model_name(model_str):
+    """
+    모델명을 사람이 읽기 쉬운 형식으로 변환 (캐싱 적용)
+    예: claude-sonnet-4-5-20250929 → Claude-Sonnet-4.5
+        gpt-4o-mini → GPT-4o-Mini
+        llama-3-3-70b → Llama-3.3-70b
+    """
+    # 날짜 패턴 제거 (8자리 숫자)
+    model_str = re.sub(r'-\d{8}$', '', model_str)
+    
+    # 특수 케이스: GPT 모델
+    if model_str.startswith('gpt-'):
+        parts = model_str.split('-')
+        formatted_parts = ['GPT']
+        
+        for i in range(1, len(parts)):
+            part = parts[i]
+            if part == '4o' or part == '3.5':
+                formatted_parts.append(part)
+            elif part.isdigit():
+                formatted_parts.append(part)
+            else:
+                formatted_parts.append(part.capitalize())
+        
+        return '-'.join(formatted_parts)
+    
+    # Claude 모델 처리
+    if model_str.startswith('claude-'):
+        parts = model_str.split('-')
+        formatted_parts = ['Claude']
+        
+        i = 1
+        while i < len(parts):
+            part = parts[i]
+            
+            if i + 1 < len(parts) and part.isdigit() and parts[i+1].isdigit():
+                formatted_parts.append(f"{part}.{parts[i+1]}")
+                i += 2
+            elif part in ['sonnet', 'haiku', 'opus']:
+                formatted_parts.append(part.capitalize())
+                i += 1
+            elif part.isdigit():
+                formatted_parts.append(part)
+                i += 1
+            else:
+                formatted_parts.append(part.capitalize())
+                i += 1
+        
+        return '-'.join(formatted_parts)
+    
+    # 기타 모델: 스마트 버전 번호 처리
+    parts = model_str.split('-')
+    formatted_parts = []
+    
+    i = 0
+    while i < len(parts):
+        part = parts[i]
+        
+        if i == 0:
+            if len(part) > 1 and part[:-1].isalpha() and part[-1].isdigit():
+                if i + 1 < len(parts) and parts[i+1].isdigit() and len(parts[i+1]) == 1:
+                    formatted_parts.append(f"{part.capitalize()}.{parts[i+1]}")
+                    i += 2
+                    continue
+            formatted_parts.append(part.capitalize())
+            i += 1
+        elif (i + 1 < len(parts) and 
+              part.isdigit() and len(part) == 1 and 
+              parts[i+1].isdigit() and len(parts[i+1]) == 1):
+            formatted_parts.append(f"{part}.{parts[i+1]}")
+            i += 2
+        elif not part.isdigit() and not any(c.isdigit() for c in part):
+            formatted_parts.append(part.capitalize())
+            i += 1
+        else:
+            formatted_parts.append(part)
+            i += 1
+    
+    return '-'.join(formatted_parts)
 
 
 # 데이터 로드 함수
@@ -1435,104 +1532,7 @@ def load_data(data_dir):
             # 언더스코어를 하이픈으로 변환하고 소문자로 정규화
             model_normalized = model_raw.lower().replace('_', '-')
             
-            # 스마트 모델명 표시 변환 함수
-            def format_model_name(model_str):
-                """
-                모델명을 사람이 읽기 쉬운 형식으로 변환
-                예: claude-sonnet-4-5-20250929 → Claude-Sonnet-4.5
-                    gpt-4o-mini → GPT-4o-Mini
-                    llama-3-3-70b → Llama-3.3-70b
-                """
-                # 날짜 패턴 제거 (8자리 숫자)
-                import re
-                model_str = re.sub(r'-\d{8}$', '', model_str)
-                
-                # 특수 케이스: GPT 모델
-                if model_str.startswith('gpt-'):
-                    # gpt-4o-mini → GPT-4o-Mini
-                    parts = model_str.split('-')
-                    formatted_parts = ['GPT']
-                    
-                    for i in range(1, len(parts)):
-                        part = parts[i]
-                        # 4o는 그대로 유지 (소문자 o)
-                        if part == '4o' or part == '3.5':
-                            formatted_parts.append(part)
-                        # 숫자는 그대로
-                        elif part.isdigit():
-                            formatted_parts.append(part)
-                        # mini, turbo 등은 첫 글자만 대문자
-                        else:
-                            formatted_parts.append(part.capitalize())
-                    
-                    return '-'.join(formatted_parts)
-                
-                # Claude 모델 처리
-                if model_str.startswith('claude-'):
-                    parts = model_str.split('-')
-                    formatted_parts = ['Claude']
-                    
-                    i = 1
-                    while i < len(parts):
-                        part = parts[i]
-                        
-                        # 버전 번호 처리 (4-5 → 4.5, 3-5 → 3.5)
-                        if i + 1 < len(parts) and part.isdigit() and parts[i+1].isdigit():
-                            formatted_parts.append(f"{part}.{parts[i+1]}")
-                            i += 2
-                        # 모델 타입은 첫 글자 대문자
-                        elif part in ['sonnet', 'haiku', 'opus']:
-                            formatted_parts.append(part.capitalize())
-                            i += 1
-                        # 숫자는 그대로
-                        elif part.isdigit():
-                            formatted_parts.append(part)
-                            i += 1
-                        else:
-                            formatted_parts.append(part.capitalize())
-                            i += 1
-                    
-                    return '-'.join(formatted_parts)
-                
-                # 기타 모델: 스마트 버전 번호 처리
-                # 예: llama-3-3-70b → Llama-3.3-70b
-                #     qwen-2-5-72b → Qwen-2.5-72b
-                #     qwen2-5-32b → Qwen2.5-32b
-                parts = model_str.split('-')
-                formatted_parts = []
-                
-                i = 0
-                while i < len(parts):
-                    part = parts[i]
-                    
-                    # 첫 번째 파트 (모델명)
-                    if i == 0:
-                        # 특수 케이스: qwen2, llama3 등 숫자가 붙은 모델명
-                        if part[:-1].isalpha() and part[-1].isdigit():
-                            # 다음 파트가 한 자리 숫자면 버전으로 변환
-                            if i + 1 < len(parts) and parts[i+1].isdigit() and len(parts[i+1]) == 1:
-                                formatted_parts.append(f"{part.capitalize()}.{parts[i+1]}")
-                                i += 2
-                                continue
-                        formatted_parts.append(part.capitalize())
-                        i += 1
-                    # 연속된 두 개의 한 자리 숫자 → 버전 번호로 변환
-                    elif (i + 1 < len(parts) and 
-                          part.isdigit() and len(part) == 1 and 
-                          parts[i+1].isdigit() and len(parts[i+1]) == 1):
-                        formatted_parts.append(f"{part}.{parts[i+1]}")
-                        i += 2
-                    # 일반 단어는 첫 글자 대문자
-                    elif not part.isdigit() and not any(c.isdigit() for c in part):
-                        formatted_parts.append(part.capitalize())
-                        i += 1
-                    # 숫자나 숫자+문자 조합은 그대로
-                    else:
-                        formatted_parts.append(part)
-                        i += 1
-                
-                return '-'.join(formatted_parts)
-            
+            # 외부에 정의된 캐싱된 format_model_name 함수 사용
             model = format_model_name(model_normalized)
             
             # CSV 파일 읽기
@@ -1758,11 +1758,11 @@ def main():
         help="여러 테스트를 선택할 수 있습니다"
     )
     
-    # 테스트 선택에 따른 데이터 필터링
+    # 테스트 선택에 따른 데이터 필터링 (마지막에 한 번만 .copy() 수행)
     if selected_tests:
-        filtered_df = results_df[results_df['테스트명'].isin(selected_tests)].copy()
+        filtered_df = results_df[results_df['테스트명'].isin(selected_tests)]
     else:
-        filtered_df = results_df.copy()
+        filtered_df = results_df
     
     # ========== 앙상블 모델 관리 ==========
     st.sidebar.markdown("---")
@@ -1801,7 +1801,7 @@ def main():
         )
         
         # 앙상블 추가 버튼
-        if st.button(f"✅ {t['add_ensemble']}", width='stretch', key="add_ensemble_btn"):
+        if st.button(f"✅ {t['add_ensemble']}", use_container_width=True, key="add_ensemble_btn"):
             # 유효성 검사
             if not ensemble_name_input or ensemble_name_input.strip() == "":
                 st.error("앙상블 이름을 입력하세요" if lang == 'ko' else "Please enter ensemble name")
@@ -1859,19 +1859,19 @@ def main():
             # results_df에 앙상블 데이터 추가 (원본은 유지, 통합 데이터는 별도)
             integrated_df = pd.concat([results_df] + ensemble_dfs, ignore_index=True)
             
-            # filtered_df를 integrated_df 기반으로 재생성
+            # filtered_df를 integrated_df 기반으로 재생성 (마지막에만 copy)
             if selected_tests:
-                filtered_df = integrated_df[integrated_df['테스트명'].isin(selected_tests)].copy()
+                filtered_df = integrated_df[integrated_df['테스트명'].isin(selected_tests)]
             else:
-                filtered_df = integrated_df.copy()
+                filtered_df = integrated_df
             
             st.sidebar.success(f"🎯 {len(st.session_state.ensembles)}개 앙상블 활성" if lang == 'ko' else f"🎯 {len(st.session_state.ensembles)} ensemble(s) active")
         else:
             # 앙상블 데이터가 없으면 원본 사용
             if selected_tests:
-                filtered_df = results_df[results_df['테스트명'].isin(selected_tests)].copy()
+                filtered_df = results_df[results_df['테스트명'].isin(selected_tests)]
             else:
-                filtered_df = results_df.copy()
+                filtered_df = results_df
     else:
         st.sidebar.info(t['no_ensembles'])
     
@@ -2532,8 +2532,8 @@ def main():
                 time_col = '총소요시간(초)'
                 is_per_problem = False
             
-            # NaN 값 제거
-            time_df = filtered_df[filtered_df[time_col].notna()].copy()
+            # NaN 값 제거 (view만 생성, copy 불필요)
+            time_df = filtered_df[filtered_df[time_col].notna()]
             
             if len(time_df) == 0:
                 st.info("No valid response time data available.")
@@ -3017,11 +3017,17 @@ def main():
                 st.write(f"- 선택된 모델: {selected_models}")
                 st.write(f"- 선택된 연도: {selected_years if 'selected_years' in locals() else '전체'}")
             
-            # Year를 정수로 변환
-            filtered_df['Year_Int'] = filtered_df['Year'].apply(safe_convert_to_int)
-            year_df = filtered_df[filtered_df['Year_Int'].notna()].copy()
+            # Year를 정수로 변환 (원본 수정 없이)
+            year_int_series = filtered_df['Year'].apply(safe_convert_to_int)
+            valid_year_mask = year_int_series.notna()
             
-            if not year_df.empty:
+            if valid_year_mask.any():
+                # 필요한 컬럼만 선택하여 새 DataFrame 생성
+                year_df = pd.DataFrame({
+                    'Year_Int': year_int_series[valid_year_mask],
+                    '정답여부': filtered_df.loc[valid_year_mask, '정답여부']
+                })
+                
                 # 연도별 성능
                 year_stats = year_df.groupby('Year_Int').agg({
                     '정답여부': ['sum', 'count', 'mean']
@@ -3304,12 +3310,8 @@ def main():
             correct_models_list.append('✓ ' + ', '.join(sorted(correct_models)) if correct_models else '-')
             incorrect_models_list.append('✗ ' + ', '.join(sorted(incorrect_models)) if incorrect_models else '-')
             
-            # 각 모델이 선택한 답 수집
-            answers_by_model = {}
-            for _, row in q_df.iterrows():
-                model = row['모델']
-                selected = row.get('예측답', 'N/A')
-                answers_by_model[model] = selected
+            # 각 모델이 선택한 답 수집 (iterrows 대신 zip 사용)
+            answers_by_model = dict(zip(q_df['모델'].values, q_df['예측답'].fillna('N/A').values))
             selected_answers_dict.append(answers_by_model)
         
         problem_analysis['correct_models'] = correct_models_list
@@ -4949,13 +4951,13 @@ def main():
         if not available_cols:
             st.info("Token usage data not available in the dataset." if lang == 'en' else "토큰 사용량 데이터가 데이터셋에 없습니다.")
         else:
-            # 데이터 준비
-            token_df = filtered_df.copy()
-            
-            # NaN 제거
+            # 데이터 준비 - NaN 필터링을 한 번에 처리 (copy 제거)
+            valid_mask = pd.Series(True, index=filtered_df.index)
             for key, col in available_cols.items():
-                if col in token_df.columns:
-                    token_df = token_df[token_df[col].notna()]
+                if col in filtered_df.columns:
+                    valid_mask &= filtered_df[col].notna()
+            
+            token_df = filtered_df[valid_mask]
             
             if len(token_df) == 0:
                 st.info("No valid token data available after filtering." if lang == 'en' else "필터링 후 유효한 토큰 데이터가 없습니다.")
@@ -6448,14 +6450,21 @@ def main():
                 else:
                     return '매우 쉬움' if lang == 'ko' else 'Very Easy'
             
-            filtered_df_copy = filtered_df.copy()
-            filtered_df_copy['difficulty_level'] = filtered_df_copy['Question'].map(
+            # 상위 5개 모델 선택
+            top_models = filtered_df.groupby('모델')['정답여부'].mean().nlargest(5).index.tolist()
+            top_models_mask = filtered_df['모델'].isin(top_models)
+            
+            # 난이도 레벨 계산 (필요한 데이터만)
+            difficulty_levels = filtered_df.loc[top_models_mask, 'Question'].map(
                 lambda q: classify_difficulty_simple(difficulty.get(q, 50))
             )
             
-            # 상위 5개 모델 선택
-            top_models = filtered_df.groupby('모델')['정답여부'].mean().nlargest(5).index.tolist()
-            radar_df = filtered_df_copy[filtered_df_copy['모델'].isin(top_models)]
+            # 필요한 데이터만 추출하여 분석
+            radar_df = pd.DataFrame({
+                '모델': filtered_df.loc[top_models_mask, '모델'],
+                'difficulty_level': difficulty_levels,
+                '정답여부': filtered_df.loc[top_models_mask, '정답여부']
+            })
             
             # 모델별 난이도별 성능
             radar_data = radar_df.groupby(['모델', 'difficulty_level'])['정답여부'].mean() * 100
@@ -6533,36 +6542,43 @@ def main():
         models_list = filtered_df['모델'].unique()
         
         if len(models_list) >= 2:
-            # 모델 쌍별 오답 일치도 계산
+            # 최적화: 모델별 오답 정보를 미리 계산하여 딕셔너리로 저장
+            model_wrong_dict = {}
+            for model in models_list:
+                model_df = filtered_df[filtered_df['모델'] == model]
+                # Question별 정답여부를 딕셔너리로 저장
+                wrong_questions = set(model_df[~model_df['정답여부']]['Question'].values)
+                all_questions = set(model_df['Question'].values)
+                model_wrong_dict[model] = {
+                    'wrong': wrong_questions,
+                    'all': all_questions
+                }
+            
+            # 모델 쌍별 오답 일치도 계산 (최적화된 버전)
             agreement_matrix = []
             
             for model1 in models_list:
                 row = []
+                m1_data = model_wrong_dict[model1]
+                
                 for model2 in models_list:
                     if model1 == model2:
                         row.append(100.0)
                     else:
-                        # 두 모델이 모두 평가한 문제
-                        model1_df = filtered_df[filtered_df['모델'] == model1]
-                        model2_df = filtered_df[filtered_df['모델'] == model2]
+                        m2_data = model_wrong_dict[model2]
                         
-                        common_questions = set(model1_df['Question']) & set(model2_df['Question'])
+                        # 공통 문제
+                        common_questions = m1_data['all'] & m2_data['all']
                         
                         if len(common_questions) > 0:
-                            # 두 모델이 모두 틀린 문제 수
-                            both_wrong = 0
-                            for q in common_questions:
-                                q1_correct = model1_df[model1_df['Question'] == q]['정답여부'].values[0]
-                                q2_correct = model2_df[model2_df['Question'] == q]['정답여부'].values[0]
-                                
-                                if not q1_correct and not q2_correct:
-                                    both_wrong += 1
+                            # 두 모델이 모두 틀린 문제 (공통 문제 중)
+                            both_wrong = len(m1_data['wrong'] & m2_data['wrong'] & common_questions)
                             
-                            # 적어도 한 모델이 틀린 문제 중 두 모델이 모두 틀린 비율
-                            model1_wrong = sum(~model1_df[model1_df['Question'].isin(common_questions)]['정답여부'])
-                            model2_wrong = sum(~model2_df[model2_df['Question'].isin(common_questions)]['정답여부'])
+                            # 각 모델이 틀린 문제 수 (공통 문제 중)
+                            model1_wrong_count = len(m1_data['wrong'] & common_questions)
+                            model2_wrong_count = len(m2_data['wrong'] & common_questions)
                             
-                            total_wrong = model1_wrong + model2_wrong - both_wrong
+                            total_wrong = model1_wrong_count + model2_wrong_count - both_wrong
                             
                             if total_wrong > 0:
                                 agreement = (both_wrong / total_wrong) * 100
@@ -6570,8 +6586,8 @@ def main():
                                 agreement = 0
                         else:
                             agreement = 0
-                    
-                    row.append(round(agreement, 1))
+                        
+                        row.append(round(agreement, 1))
                 
                 agreement_matrix.append(row)
             
@@ -6694,6 +6710,9 @@ def main():
             st.success("💡 " + ("SafetyQ&A는 전문 영역(안전/법령) 벤치마크로, 범용 벤치마크(MMLU, GPQA)와 다른 패턴을 보입니다." if lang == 'ko' else "SafetyQ&A is a specialized benchmark (safety/law) showing different patterns from general benchmarks (MMLU, GPQA)."))
     
     st.sidebar.info(f"📊 {t['current_data']}: {len(filtered_df):,}{t['problems']}")
+    
+    # 메모리 정리 (대용량 데이터 처리 후)
+    gc.collect()
 
 if __name__ == "__main__":
     main()

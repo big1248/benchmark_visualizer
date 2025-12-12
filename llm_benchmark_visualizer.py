@@ -3022,10 +3022,11 @@ def main():
             valid_year_mask = year_int_series.notna()
             
             if valid_year_mask.any():
-                # 필요한 컬럼만 선택하여 새 DataFrame 생성
+                # 필요한 컬럼만 선택하여 새 DataFrame 생성 (모델 컬럼 포함)
                 year_df = pd.DataFrame({
                     'Year_Int': year_int_series[valid_year_mask],
-                    '정답여부': filtered_df.loc[valid_year_mask, '정답여부']
+                    '정답여부': filtered_df.loc[valid_year_mask, '정답여부'],
+                    '모델': filtered_df.loc[valid_year_mask, '모델']
                 })
                 
                 # 연도별 성능

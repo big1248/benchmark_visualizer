@@ -6354,6 +6354,194 @@ def main():
             
             st.markdown("---")
         
+        # Figure 7-1: 테스트셋별 연도별 정답률 추이 (NEW!)
+        st.subheader("📈 " + ("Figure 7-1: 테스트셋별 연도별 정답률 추이" if lang == 'ko' else "Figure 7-1: Accuracy Trend by Year and Test Set"))
+        
+        if 'Year' in filtered_df.columns:
+            # 연도를 정수로 변환
+            year_int_series = filtered_df['Year'].apply(safe_convert_to_int)
+            valid_year_mask = year_int_series.notna()
+            
+            if valid_year_mask.any():
+                # 분석용 데이터프레임 생성
+                year_test_df = pd.DataFrame({
+                    'Year_Int': year_int_series[valid_year_mask],
+                    '정답여부': filtered_df.loc[valid_year_mask, '정답여부'],
+                    '테스트명': filtered_df.loc[valid_year_mask, '테스트명']
+                })
+                
+                # 1. 전체 연도별 정답률
+                overall_year_acc = year_test_df.groupby('Year_Int')['정답여부'].mean() * 100
+                overall_year_acc = overall_year_acc.reset_index()
+                overall_year_acc.columns = ['연도', '정답률']
+                overall_year_acc['테스트명'] = '전체 (Overall)' if lang == 'ko' else 'Overall'
+                
+                # 2. 테스트셋별 연도별 정답률
+                testset_year_acc = year_test_df.groupby(['테스트명', 'Year_Int'])['정답여부'].mean() * 100
+                testset_year_acc = testset_year_acc.reset_index()
+                testset_year_acc.columns = ['테스트명', '연도', '정답률']
+                
+                # 전체와 테스트셋별 데이터 결합
+                combined_data = pd.concat([overall_year_acc, testset_year_acc], ignore_index=True)
+                combined_data['연도'] = combined_data['연도'].astype(int)
+                combined_data = combined_data.sort_values(['테스트명', '연도'])
+                
+                # 테스트셋 목록 (전체를 맨 앞으로)
+                test_names = combined_data['테스트명'].unique().tolist()
+                overall_name = '전체 (Overall)' if lang == 'ko' else 'Overall'
+                if overall_name in test_names:
+                    test_names.remove(overall_name)
+                    test_names = [overall_name] + sorted(test_names)
+                
+                # 그래프 유형 선택
+                graph_type = st.radio(
+                    "그래프 표시 방식" if lang == 'ko' else "Graph Display Type",
+                    ["통합 그래프" if lang == 'ko' else "Combined Chart", 
+                     "개별 그래프" if lang == 'ko' else "Individual Charts"],
+                    horizontal=True,
+                    key="year_testset_graph_type"
+                )
+                
+                if graph_type == ("통합 그래프" if lang == 'ko' else "Combined Chart"):
+                    # 통합 꺾은선 그래프
+                    fig = px.line(
+                        combined_data,
+                        x='연도',
+                        y='정답률',
+                        color='테스트명',
+                        title='테스트셋별 연도별 정답률 추이' if lang == 'ko' else 'Accuracy Trend by Year and Test Set',
+                        markers=True,
+                        category_orders={'테스트명': test_names}
+                    )
+                    
+                    # 전체 라인을 굵게 표시
+                    for trace in fig.data:
+                        if trace.name == overall_name:
+                            trace.line.width = 4
+                            trace.line.dash = 'solid'
+                            trace.marker.size = 12
+                        else:
+                            trace.line.width = 2
+                            trace.marker.size = 8
+                    
+                    fig.update_traces(
+                        marker=dict(line=dict(width=1, color='black'))
+                    )
+                    fig.update_layout(
+                        height=550,
+                        yaxis_title='정답률 (%)' if lang == 'ko' else 'Accuracy (%)',
+                        xaxis_title='출제 연도' if lang == 'ko' else 'Year',
+                        yaxis=dict(range=[0, 100]),
+                        legend_title='테스트셋' if lang == 'ko' else 'Test Set',
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=-0.3,
+                            xanchor="center",
+                            x=0.5
+                        )
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                else:
+                    # 개별 그래프 - 전체 + 각 테스트셋별
+                    # 먼저 전체 그래프
+                    st.markdown("#### " + ("📊 전체 연도별 정답률" if lang == 'ko' else "📊 Overall Accuracy by Year"))
+                    overall_data = combined_data[combined_data['테스트명'] == overall_name]
+                    
+                    if len(overall_data) > 0:
+                        fig_overall = px.line(
+                            overall_data,
+                            x='연도',
+                            y='정답률',
+                            title='전체 연도별 정답률 추이' if lang == 'ko' else 'Overall Accuracy Trend by Year',
+                            markers=True,
+                            text='정답률'
+                        )
+                        fig_overall.update_traces(
+                            texttemplate='%{text:.1f}%',
+                            textposition='top center',
+                            marker=dict(size=12, line=dict(width=2, color='black')),
+                            line=dict(width=4, color='#1f77b4')
+                        )
+                        fig_overall.update_layout(
+                            height=400,
+                            yaxis_title='정답률 (%)' if lang == 'ko' else 'Accuracy (%)',
+                            xaxis_title='출제 연도' if lang == 'ko' else 'Year',
+                            yaxis=dict(range=[0, 100]),
+                            showlegend=False
+                        )
+                        st.plotly_chart(fig_overall, use_container_width=True)
+                    
+                    st.markdown("---")
+                    
+                    # 테스트셋별 개별 그래프
+                    st.markdown("#### " + ("📊 테스트셋별 연도별 정답률" if lang == 'ko' else "📊 Accuracy by Year per Test Set"))
+                    
+                    testset_only = [t for t in test_names if t != overall_name]
+                    
+                    # 2열 레이아웃으로 표시
+                    cols = st.columns(2)
+                    for idx, test_name in enumerate(testset_only):
+                        test_data = combined_data[combined_data['테스트명'] == test_name]
+                        
+                        if len(test_data) > 0:
+                            with cols[idx % 2]:
+                                fig_test = px.line(
+                                    test_data,
+                                    x='연도',
+                                    y='정답률',
+                                    title=f'{test_name}',
+                                    markers=True,
+                                    text='정답률'
+                                )
+                                fig_test.update_traces(
+                                    texttemplate='%{text:.1f}%',
+                                    textposition='top center',
+                                    marker=dict(size=10, line=dict(width=1.5, color='black')),
+                                    line=dict(width=3)
+                                )
+                                fig_test.update_layout(
+                                    height=350,
+                                    yaxis_title='정답률 (%)' if lang == 'ko' else 'Accuracy (%)',
+                                    xaxis_title='출제 연도' if lang == 'ko' else 'Year',
+                                    yaxis=dict(range=[0, 100]),
+                                    showlegend=False,
+                                    margin=dict(t=50, b=50)
+                                )
+                                st.plotly_chart(fig_test, use_container_width=True)
+                
+                # 데이터 테이블 (접이식)
+                with st.expander("📋 " + ("상세 데이터 보기" if lang == 'ko' else "View Detailed Data")):
+                    # 피벗 테이블로 변환
+                    pivot_data = combined_data.pivot(index='테스트명', columns='연도', values='정답률')
+                    pivot_data = pivot_data.reindex(test_names)
+                    
+                    # 평균 컬럼 추가
+                    pivot_data['평균' if lang == 'ko' else 'Avg'] = pivot_data.mean(axis=1)
+                    
+                    # 소수점 1자리로 포맷팅
+                    st.dataframe(
+                        pivot_data.style.format("{:.1f}%")
+                        .background_gradient(cmap='RdYlGn', axis=None, vmin=0, vmax=100),
+                        use_container_width=True
+                    )
+                    
+                    # 다운로드 버튼
+                    csv_data = pivot_data.reset_index().to_csv(index=False, encoding='utf-8-sig')
+                    st.download_button(
+                        label="📥 CSV " + ("다운로드" if lang == 'ko' else "Download"),
+                        data=csv_data,
+                        file_name="year_testset_accuracy.csv",
+                        mime="text/csv"
+                    )
+            else:
+                st.info("유효한 연도 데이터가 없습니다." if lang == 'ko' else "No valid year data available.")
+        else:
+            st.info("연도(Year) 컬럼이 데이터에 없습니다." if lang == 'ko' else "Year column not found in data.")
+        
+        st.markdown("---")
+        
         # Figure 4: 출시 시기-성능 산점도
         if table3 is not None and len(table3) > 0:
             st.subheader("📅 " + ("Figure 4: 출시 시기-성능 추이" if lang == 'ko' else "Figure 4: Release Date vs Performance"))

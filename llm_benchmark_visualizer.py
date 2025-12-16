@@ -4511,7 +4511,10 @@ def main():
             if len(wrong_df) > 0:
                 # 가장 많이 선택된 오답의 비율
                 wrong_answer_counts = wrong_df['예측답'].value_counts()
-                consistency = wrong_answer_counts.iloc[0] / len(wrong_df) if len(wrong_df) > 0 else 0
+                if len(wrong_answer_counts) > 0:
+                    consistency = wrong_answer_counts.iloc[0] / len(wrong_df)
+                else:
+                    consistency = 0
             else:
                 consistency = 0
             consistency_list.append(consistency)

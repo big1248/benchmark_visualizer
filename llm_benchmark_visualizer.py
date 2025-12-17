@@ -4595,7 +4595,7 @@ def main():
                 colorscale='YlOrRd',
                 text=heatmap_pivot.values,
                 texttemplate='%{text}',
-                textfont={"size": 12},
+                textfont={"size": annotation_size},
                 colorbar=dict(title="문제 수" if lang == 'ko' else "Count"),
                 hoverongaps=False
             ))
@@ -4608,6 +4608,8 @@ def main():
                 xaxis=dict(side='bottom'),
                 yaxis=dict(autorange='reversed')  # 위에서 아래로
             )
+            fig_heatmap.update_xaxes(tickfont=dict(size=annotation_size))
+            fig_heatmap.update_yaxes(tickfont=dict(size=annotation_size))
             
             st.plotly_chart(fig_heatmap, use_container_width=True)
             
@@ -4651,6 +4653,7 @@ def main():
                 y=testset_risk['고위험 문제 수'],
                 text=testset_risk['고위험 문제 수'],
                 textposition='outside',
+                textfont=dict(size=annotation_size),
                 marker_color='#e74c3c',
                 marker_line_color='black',
                 marker_line_width=1.5
@@ -4663,7 +4666,8 @@ def main():
                 height=450,
                 showlegend=False
             )
-            fig_testset.update_xaxes(tickangle=45)
+            fig_testset.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
+            fig_testset.update_yaxes(tickfont=dict(size=annotation_size))
             
             st.plotly_chart(fig_testset, use_container_width=True)
             
@@ -4679,7 +4683,7 @@ def main():
                 color_continuous_scale='Reds',
                 title='테스트셋별 고위험 문제 비율' if lang == 'ko' else 'High-Risk Problem Ratio by Test Set'
             )
-            fig_ratio.update_traces(textposition='outside', marker_line_color='black', marker_line_width=1)
+            fig_ratio.update_traces(textposition='outside', textfont=dict(size=annotation_size), marker_line_color='black', marker_line_width=1)
             fig_ratio.update_layout(
                 height=400,
                 showlegend=False,
@@ -4687,7 +4691,8 @@ def main():
                 xaxis_title='테스트셋' if lang == 'ko' else 'Test Set',
                 coloraxis_showscale=False
             )
-            fig_ratio.update_xaxes(tickangle=45)
+            fig_ratio.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
+            fig_ratio.update_yaxes(tickfont=dict(size=annotation_size))
             
             st.plotly_chart(fig_ratio, use_container_width=True)
             
@@ -6124,6 +6129,7 @@ def main():
             fig.update_traces(
                 texttemplate='%{text:.1f}%',
                 textposition='outside',
+                textfont=dict(size=annotation_size),
                 marker_line_color='black',
                 marker_line_width=1.5
             )
@@ -6134,7 +6140,8 @@ def main():
                 xaxis_title='테스트명' if lang == 'ko' else 'Test Name',
                 yaxis=dict(range=[0, 100])
             )
-            fig.update_xaxes(tickangle=45)
+            fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
+            fig.update_yaxes(tickfont=dict(size=annotation_size))
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("테스트셋 데이터가 없습니다." if lang == 'ko' else "No test set data available.")
@@ -6194,10 +6201,12 @@ def main():
                     yanchor="bottom",
                     y=1.02,
                     xanchor="right",
-                    x=1
+                    x=1,
+                    font=dict(size=annotation_size)
                 )
             )
-            fig.update_xaxes(tickangle=45)
+            fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
+            fig.update_yaxes(tickfont=dict(size=annotation_size))
             st.plotly_chart(fig, use_container_width=True)
             
             # 정답률 차이 막대 그래프
@@ -6214,6 +6223,7 @@ def main():
             fig2.update_traces(
                 texttemplate='%{text:.1f}%p',
                 textposition='outside',
+                textfont=dict(size=annotation_size),
                 marker_line_color='black',
                 marker_line_width=1.5
             )
@@ -6223,7 +6233,8 @@ def main():
                 yaxis_title='정답률 차이 (%p)' if lang == 'ko' else 'Accuracy Difference (%p)',
                 xaxis_title='테스트명' if lang == 'ko' else 'Test Name'
             )
-            fig2.update_xaxes(tickangle=45)
+            fig2.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
+            fig2.update_yaxes(tickfont=dict(size=annotation_size))
             st.plotly_chart(fig2, use_container_width=True)
             
             # 인사이트 표시
@@ -6367,6 +6378,7 @@ def main():
         fig.update_traces(
             texttemplate='%{text:.1f}%',
             textposition='outside',
+            textfont=dict(size=annotation_size),
             marker_line_color='black',
             marker_line_width=1.5
         )
@@ -6377,7 +6389,8 @@ def main():
             xaxis_title='모델' if lang == 'ko' else 'Model',
             yaxis=dict(range=[0, 100])
         )
-        fig.update_xaxes(tickangle=45)
+        fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
+        fig.update_yaxes(tickfont=dict(size=annotation_size))
         st.plotly_chart(fig, use_container_width=True)
         
         st.markdown("---")
@@ -6416,7 +6429,8 @@ def main():
                 yaxis=dict(range=[0, 100]),
                 showlegend=False
             )
-            fig.update_xaxes(tickangle=45)
+            fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
+            fig.update_yaxes(tickfont=dict(size=annotation_size))
             st.plotly_chart(fig, use_container_width=True)
             
             st.markdown("---")
@@ -6436,7 +6450,7 @@ def main():
                 colorscale='RdYlGn',
                 text=np.round(subject_model_pivot.values, 1),
                 texttemplate='%{text:.1f}',
-                textfont={"size": int(10 * chart_text_size)},
+                textfont={"size": annotation_size},
                 colorbar=dict(title="정답률 (%)" if lang == 'ko' else "Accuracy (%)")
             ))
             
@@ -6446,7 +6460,8 @@ def main():
                 xaxis_title='과목' if lang == 'ko' else 'Subject',
                 yaxis_title='모델' if lang == 'ko' else 'Model'
             )
-            fig.update_xaxes(tickangle=45)
+            fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
+            fig.update_yaxes(tickfont=dict(size=annotation_size))
             st.plotly_chart(fig, use_container_width=True)
             
             st.markdown("---")
@@ -6468,12 +6483,15 @@ def main():
             
             fig.update_traces(
                 textposition='top center',
+                textfont=dict(size=annotation_size),
                 marker=dict(size=15, line=dict(width=1.5, color='black'))
             )
             fig.update_layout(
                 height=500,
                 yaxis=dict(range=[0, 100])
             )
+            fig.update_xaxes(tickfont=dict(size=annotation_size))
+            fig.update_yaxes(tickfont=dict(size=annotation_size))
             st.plotly_chart(fig, use_container_width=True)
             
             st.info("💡 " + ("왼쪽 위(빠른 시간 + 높은 정확도)가 가장 효율적입니다." if lang == 'ko' else "Top left (fast time + high accuracy) is most efficient."))
@@ -6519,9 +6537,11 @@ def main():
                 height=500,
                 yaxis_title='정답률 (%)' if lang == 'ko' else 'Accuracy (%)',
                 xaxis_title='모델' if lang == 'ko' else 'Model',
-                yaxis=dict(range=[0, 100])
+                yaxis=dict(range=[0, 100]),
+                legend=dict(font=dict(size=annotation_size))
             )
-            fig.update_xaxes(tickangle=45)
+            fig.update_xaxes(tickangle=45, tickfont=dict(size=annotation_size))
+            fig.update_yaxes(tickfont=dict(size=annotation_size))
             st.plotly_chart(fig, use_container_width=True)
             
             st.markdown("---")
@@ -6573,6 +6593,7 @@ def main():
                     fig.update_traces(
                         texttemplate='%{text:.1f}%',
                         textposition='top center',
+                        textfont=dict(size=annotation_size),
                         marker=dict(size=10, line=dict(width=2, color='black')),
                         line=dict(width=3)
                     )
@@ -6582,6 +6603,8 @@ def main():
                         xaxis_title='출제 연도' if lang == 'ko' else 'Year',
                         yaxis=dict(range=[0, 100])
                     )
+                    fig.update_xaxes(tickfont=dict(size=annotation_size))
+                    fig.update_yaxes(tickfont=dict(size=annotation_size))
                     st.plotly_chart(fig, use_container_width=True)
                 except Exception as e:
                     st.error(f"{'차트 생성 오류' if lang == 'ko' else 'Chart creation error'}: {str(e)}")
@@ -6677,9 +6700,12 @@ def main():
                             yanchor="bottom",
                             y=-0.3,
                             xanchor="center",
-                            x=0.5
+                            x=0.5,
+                            font=dict(size=annotation_size)
                         )
                     )
+                    fig.update_xaxes(tickfont=dict(size=annotation_size))
+                    fig.update_yaxes(tickfont=dict(size=annotation_size))
                     st.plotly_chart(fig, use_container_width=True)
                     
                 else:
@@ -6700,6 +6726,7 @@ def main():
                         fig_overall.update_traces(
                             texttemplate='%{text:.1f}%',
                             textposition='top center',
+                            textfont=dict(size=annotation_size),
                             marker=dict(size=12, line=dict(width=2, color='black')),
                             line=dict(width=4, color='#1f77b4')
                         )
@@ -6710,6 +6737,8 @@ def main():
                             yaxis=dict(range=[0, 100]),
                             showlegend=False
                         )
+                        fig_overall.update_xaxes(tickfont=dict(size=annotation_size))
+                        fig_overall.update_yaxes(tickfont=dict(size=annotation_size))
                         st.plotly_chart(fig_overall, use_container_width=True)
                     
                     st.markdown("---")
@@ -6737,6 +6766,7 @@ def main():
                                 fig_test.update_traces(
                                     texttemplate='%{text:.1f}%',
                                     textposition='top center',
+                                    textfont=dict(size=annotation_size),
                                     marker=dict(size=10, line=dict(width=1.5, color='black')),
                                     line=dict(width=3)
                                 )
@@ -6748,6 +6778,8 @@ def main():
                                     showlegend=False,
                                     margin=dict(t=50, b=50)
                                 )
+                                fig_test.update_xaxes(tickfont=dict(size=annotation_size))
+                                fig_test.update_yaxes(tickfont=dict(size=annotation_size))
                                 st.plotly_chart(fig_test, use_container_width=True)
                 
                 # 데이터 테이블 (접이식)

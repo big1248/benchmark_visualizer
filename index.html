@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM 벤치마크 시각화</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>LLM 벤치마크 시각화 · Streamlit</title>
     
     <!-- Plotly.js -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
@@ -18,48 +15,391 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
     <style>
-        /* 커스텀 스타일 */
+        /* Streamlit 스타일 재현 */
         :root {
-            --primary: #3b82f6;
-            --primary-dark: #2563eb;
-            --bg-dark: #1e293b;
-            --bg-card: #334155;
+            --primary-color: #ff4b4b;
+            --background-color: #ffffff;
+            --secondary-bg: #f0f2f6;
+            --text-color: #262730;
+            --font-family: "Source Sans Pro", sans-serif;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
         
         body {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            font-family: var(--font-family);
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+        
+        /* 레이아웃 */
+        .app-container {
+            display: flex;
             min-height: 100vh;
         }
         
-        .glass-card {
-            background: rgba(51, 65, 85, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        /* 사이드바 */
+        .sidebar {
+            width: 300px;
+            min-width: 300px;
+            background-color: var(--secondary-bg);
+            padding: 1rem;
+            border-right: 1px solid #e6e9ef;
+            height: 100vh;
+            overflow-y: auto;
+            position: fixed;
+            left: 0;
+            top: 0;
         }
         
-        .metric-card {
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-        }
-        
-        .tab-btn.active {
-            background: var(--primary);
-            color: white;
-        }
-        
-        .tab-btn {
-            transition: all 0.3s ease;
-        }
-        
-        .tab-btn:hover {
-            background: rgba(59, 130, 246, 0.3);
-        }
-        
-        .loader {
-            border: 4px solid rgba(255,255,255,0.1);
-            border-left-color: #3b82f6;
+        .sidebar-toggle {
+            position: absolute;
+            right: -12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 24px;
+            height: 24px;
+            background: white;
+            border: 1px solid #e6e9ef;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #666;
+            z-index: 100;
+        }
+        
+        .sidebar-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .sidebar-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .sidebar-divider {
+            height: 1px;
+            background: #e6e9ef;
+            margin: 1rem 0;
+        }
+        
+        /* 셀렉트박스 */
+        .st-selectbox {
+            margin-bottom: 1rem;
+        }
+        
+        .st-selectbox label {
+            font-size: 0.875rem;
+            color: #666;
+            margin-bottom: 0.25rem;
+            display: block;
+        }
+        
+        .st-selectbox select {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #e6e9ef;
+            border-radius: 0.375rem;
+            background: white;
+            font-size: 0.875rem;
+            color: var(--text-color);
+            cursor: pointer;
+        }
+        
+        .st-selectbox select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 1px var(--primary-color);
+        }
+        
+        /* 슬라이더 */
+        .st-slider {
+            margin-bottom: 1rem;
+        }
+        
+        .st-slider label {
+            font-size: 0.875rem;
+            color: #666;
+            margin-bottom: 0.25rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .st-slider input[type="range"] {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            background: #e6e9ef;
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        .st-slider input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        .slider-value {
+            font-size: 0.75rem;
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+        
+        /* 멀티셀렉트 (태그 스타일) */
+        .st-multiselect {
+            margin-bottom: 1rem;
+        }
+        
+        .st-multiselect label {
+            font-size: 0.875rem;
+            color: #666;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
+        .tag-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        .tag {
+            background: #e8eaed;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .tag .remove {
+            cursor: pointer;
+            color: #666;
+            font-size: 1rem;
+            line-height: 1;
+        }
+        
+        .tag .remove:hover {
+            color: var(--primary-color);
+        }
+        
+        /* 메인 컨텐츠 */
+        .main-content {
+            flex: 1;
+            margin-left: 300px;
+            padding: 2rem 3rem;
+            max-width: 1200px;
+        }
+        
+        /* 헤더 */
+        .app-header {
+            margin-bottom: 2rem;
+        }
+        
+        .app-title {
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .app-title .icon {
+            font-size: 2.5rem;
+        }
+        
+        /* 탭 네비게이션 */
+        .tabs-container {
+            border-bottom: 1px solid #e6e9ef;
+            margin-bottom: 2rem;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 0;
+            overflow-x: auto;
+        }
+        
+        .tab {
+            padding: 0.75rem 1rem;
+            font-size: 0.9rem;
+            color: #666;
+            cursor: pointer;
+            border: none;
+            background: none;
+            white-space: nowrap;
+            position: relative;
+            transition: color 0.2s;
+        }
+        
+        .tab:hover {
+            color: var(--text-color);
+        }
+        
+        .tab.active {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+        
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--primary-color);
+            border-radius: 3px 3px 0 0;
+        }
+        
+        /* 섹션 제목 */
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .section-subtitle {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 1.5rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        /* 메트릭 카드 (Streamlit 스타일) */
+        .metrics-row {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+        
+        .metric {
+            flex: 1;
+            min-width: 150px;
+        }
+        
+        .metric-label {
+            font-size: 0.875rem;
+            color: #666;
+            margin-bottom: 0.25rem;
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-color);
+        }
+        
+        .metric-delta {
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
+        .metric-delta.positive {
+            color: #09ab3b;
+        }
+        
+        .metric-delta.negative {
+            color: var(--primary-color);
+        }
+        
+        /* 테이블 (Streamlit 스타일) */
+        .st-table-container {
+            overflow-x: auto;
+            margin-bottom: 2rem;
+        }
+        
+        .st-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+        
+        .st-table th {
+            text-align: left;
+            padding: 0.75rem;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 1px solid #e6e9ef;
+            background: #fafafa;
+        }
+        
+        .st-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #f0f2f6;
+        }
+        
+        .st-table tr:hover {
+            background: #fafafa;
+        }
+        
+        /* 정확도 셀 (그라데이션) */
+        .accuracy-cell {
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.25rem;
+            font-weight: 600;
+            text-align: center;
+        }
+        
+        /* 차트 컨테이너 */
+        .chart-container {
+            background: white;
+            border-radius: 0.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        /* 로딩 오버레이 */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f0f2f6;
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
             animation: spin 1s linear infinite;
         }
         
@@ -67,153 +407,235 @@
             to { transform: rotate(360deg); }
         }
         
-        .progress-bar {
-            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
-            transition: width 0.3s ease;
+        .loading-text {
+            margin-top: 1rem;
+            color: #666;
+            font-size: 0.9rem;
         }
         
-        select, input {
-            background: rgba(30, 41, 59, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        select:focus, input:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
-        }
-        
-        .plotly-chart {
-            border-radius: 12px;
+        .loading-progress {
+            width: 200px;
+            height: 4px;
+            background: #e6e9ef;
+            border-radius: 2px;
+            margin-top: 1rem;
             overflow: hidden;
         }
         
-        /* 테이블 스타일 */
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
+        .loading-progress-bar {
+            height: 100%;
+            background: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s;
         }
         
-        .data-table th {
-            background: rgba(59, 130, 246, 0.3);
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
+        /* 탭 패널 */
+        .tab-panel {
+            display: none;
         }
         
-        .data-table td {
-            padding: 10px 12px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        .tab-panel.active {
+            display: block;
         }
         
-        .data-table tr:hover {
-            background: rgba(255, 255, 255, 0.05);
+        /* 그리드 레이아웃 */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
         }
         
-        /* 스크롤바 스타일 */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+        @media (max-width: 1024px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
         }
         
-        ::-webkit-scrollbar-track {
-            background: rgba(0,0,0,0.2);
-            border-radius: 4px;
+        /* 정보 박스 */
+        .info-box {
+            background: #e8f4f8;
+            border-left: 4px solid #00a3e0;
+            padding: 1rem;
+            border-radius: 0 0.25rem 0.25rem 0;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
         }
         
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.2);
-            border-radius: 4px;
+        /* 다운로드 버튼 */
+        .download-btn {
+            background: white;
+            border: 1px solid #e6e9ef;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-color);
+            transition: all 0.2s;
         }
         
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255,255,255,0.3);
+        .download-btn:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+        
+        /* 현재 데이터 표시 */
+        .data-status {
+            background: #e8f4f8;
+            padding: 0.75rem 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.85rem;
+            color: #0068c9;
+            margin-top: 1rem;
+        }
+        
+        /* 반응형 */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+            
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+                padding: 1rem;
+            }
+        }
+        
+        /* 도움말 아이콘 */
+        .help-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #e6e9ef;
+            color: #666;
+            font-size: 10px;
+            cursor: help;
+        }
+
+        /* 히든 */
+        .hidden {
+            display: none !important;
         }
     </style>
 </head>
-<body class="text-gray-100">
-    <!-- 헤더 -->
-    <header class="glass-card sticky top-0 z-50 px-6 py-4">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <h1 class="text-2xl font-bold flex items-center gap-2">
-                <span>🎯</span>
-                <span>LLM 벤치마크 시각화 도구</span>
-            </h1>
-            <div class="flex items-center gap-4">
-                <select id="langSelect" class="px-3 py-2 rounded-lg text-sm">
-                    <option value="ko">🇰🇷 한국어</option>
-                    <option value="en">🇺🇸 English</option>
-                </select>
-                <span id="dataStatus" class="text-sm text-gray-400">데이터 로딩 중...</span>
-            </div>
-        </div>
-    </header>
-
+<body>
     <!-- 로딩 오버레이 -->
-    <div id="loadingOverlay" class="fixed inset-0 bg-black/80 z-[100] flex flex-col items-center justify-center">
-        <div class="loader mb-4"></div>
-        <p id="loadingText" class="text-lg mb-4">GitHub에서 데이터 다운로드 중...</p>
-        <div class="w-64 h-2 bg-gray-700 rounded-full overflow-hidden">
-            <div id="loadingProgress" class="progress-bar h-full" style="width: 0%"></div>
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p id="loadingText" class="loading-text">데이터를 불러오는 중...</p>
+        <div class="loading-progress">
+            <div id="loadingProgressBar" class="loading-progress-bar"></div>
         </div>
-        <p id="loadingPercent" class="text-sm text-gray-400 mt-2">0%</p>
     </div>
 
-    <!-- 메인 컨텐츠 -->
-    <main class="max-w-7xl mx-auto px-6 py-8">
-        <!-- 필터 섹션 -->
-        <section id="filterSection" class="glass-card rounded-xl p-6 mb-8">
-            <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
-                <span>🔍</span>
-                <span data-i18n="filters">필터 옵션</span>
-            </h2>
-            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                <!-- 테스트명 -->
-                <div>
-                    <label class="block text-sm text-gray-400 mb-1" data-i18n="testname">테스트명</label>
-                    <select id="filterTest" class="w-full px-3 py-2 rounded-lg">
+    <div class="app-container">
+        <!-- 사이드바 -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-toggle" onclick="toggleSidebar()">«</div>
+            
+            <!-- 언어 설정 -->
+            <div class="sidebar-section">
+                <div class="st-selectbox">
+                    <label>Language / 언어</label>
+                    <select id="langSelect">
+                        <option value="ko">한국어</option>
+                        <option value="en">English</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="sidebar-divider"></div>
+            
+            <!-- 화면 설정 -->
+            <div class="sidebar-section">
+                <div class="sidebar-title">
+                    <span>⚙️</span> 화면 설정
+                </div>
+                
+                <div class="st-slider">
+                    <label>
+                        <span>화면 폰트 크기</span>
+                        <span class="help-icon" title="화면 전체 폰트 크기를 조절합니다">?</span>
+                    </label>
+                    <input type="range" id="fontSizeSlider" min="0.8" max="1.5" step="0.1" value="1.0">
+                    <div class="slider-value" id="fontSizeValue">1.00</div>
+                </div>
+                
+                <div class="st-slider">
+                    <label>
+                        <span>차트 텍스트 크기</span>
+                        <span class="help-icon" title="차트 내 텍스트 크기를 조절합니다">?</span>
+                    </label>
+                    <input type="range" id="chartSizeSlider" min="0.8" max="1.5" step="0.1" value="1.0">
+                    <div class="slider-value" id="chartSizeValue">1.00</div>
+                </div>
+            </div>
+            
+            <div class="sidebar-divider"></div>
+            
+            <!-- 필터 옵션 -->
+            <div class="sidebar-section">
+                <div class="sidebar-title">
+                    <span>🔍</span> 필터 옵션
+                </div>
+                
+                <div class="st-multiselect">
+                    <label>
+                        <span>테스트명</span>
+                        <span class="help-icon" title="분석할 테스트를 선택합니다">?</span>
+                    </label>
+                    <select id="filterTest" multiple style="display:none;"></select>
+                    <div class="tag-container" id="testTags">
+                        <!-- 태그들이 여기에 동적으로 추가됨 -->
+                    </div>
+                    <select id="filterTestAdd" class="mt-2" style="width:100%; margin-top:0.5rem; padding:0.5rem; border:1px solid #e6e9ef; border-radius:0.375rem;">
+                        <option value="">+ 테스트 추가</option>
+                    </select>
+                </div>
+                
+                <div class="st-selectbox">
+                    <label>모델</label>
+                    <select id="filterModel">
                         <option value="all">전체</option>
                     </select>
                 </div>
                 
-                <!-- 모델 -->
-                <div>
-                    <label class="block text-sm text-gray-400 mb-1" data-i18n="model">모델</label>
-                    <select id="filterModel" class="w-full px-3 py-2 rounded-lg">
+                <div class="st-selectbox">
+                    <label>상세도</label>
+                    <select id="filterDetail">
                         <option value="all">전체</option>
                     </select>
                 </div>
                 
-                <!-- 상세도 -->
-                <div>
-                    <label class="block text-sm text-gray-400 mb-1" data-i18n="detail_type">상세도</label>
-                    <select id="filterDetail" class="w-full px-3 py-2 rounded-lg">
+                <div class="st-selectbox">
+                    <label>프롬프팅 방식</label>
+                    <select id="filterPrompting">
                         <option value="all">전체</option>
                     </select>
                 </div>
                 
-                <!-- 프롬프팅 -->
-                <div>
-                    <label class="block text-sm text-gray-400 mb-1" data-i18n="prompting">프롬프팅</label>
-                    <select id="filterPrompting" class="w-full px-3 py-2 rounded-lg">
-                        <option value="all">전체</option>
-                    </select>
-                </div>
-                
-                <!-- 문제 유형 -->
-                <div>
-                    <label class="block text-sm text-gray-400 mb-1" data-i18n="problem_type">문제 유형</label>
-                    <select id="filterProblemType" class="w-full px-3 py-2 rounded-lg">
+                <div class="st-selectbox">
+                    <label>문제 유형</label>
+                    <select id="filterProblemType">
                         <option value="all">전체</option>
                         <option value="text_only">텍스트만</option>
                         <option value="image">이미지 포함</option>
                     </select>
                 </div>
                 
-                <!-- 법령 구분 -->
-                <div>
-                    <label class="block text-sm text-gray-400 mb-1" data-i18n="law_type">법령 구분</label>
-                    <select id="filterLaw" class="w-full px-3 py-2 rounded-lg">
+                <div class="st-selectbox">
+                    <label>법령 구분</label>
+                    <select id="filterLaw">
                         <option value="all">전체</option>
                         <option value="O">법령</option>
                         <option value="X">비법령</option>
@@ -221,219 +643,276 @@
                 </div>
             </div>
             
-            <!-- 현재 데이터 현황 -->
-            <div class="mt-4 pt-4 border-t border-gray-600 flex justify-between items-center">
-                <span class="text-sm text-gray-400">
-                    📊 <span data-i18n="current_data">현재 표시 중인 데이터</span>: 
-                    <span id="filteredCount" class="text-blue-400 font-semibold">0</span>
-                    <span data-i18n="problems">개 문제</span>
-                </span>
-                <button id="resetFilters" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg text-sm transition">
-                    🔄 필터 초기화
-                </button>
+            <!-- 현재 데이터 상태 -->
+            <div class="data-status">
+                📊 현재 표시 중인 데이터: <strong id="filteredCount">0</strong>개 문제
             </div>
-        </section>
+        </aside>
 
-        <!-- 탭 네비게이션 -->
-        <nav class="flex flex-wrap gap-2 mb-6">
-            <button class="tab-btn active px-4 py-2 rounded-lg text-sm font-medium" data-tab="overview">
-                📊 <span data-i18n="overview">전체 요약</span>
-            </button>
-            <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="model">
-                🤖 <span data-i18n="model_comparison">모델별 비교</span>
-            </button>
-            <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="response">
-                ⏱️ <span data-i18n="response_time_analysis">응답시간 분석</span>
-            </button>
-            <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="law">
-                ⚖️ <span data-i18n="law_analysis">법령/비법령 분석</span>
-            </button>
-            <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="subject">
-                📚 <span data-i18n="subject_analysis">과목별 분석</span>
-            </button>
-            <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="year">
-                📅 <span data-i18n="year_analysis">연도별 분석</span>
-            </button>
-            <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="incorrect">
-                ❌ <span data-i18n="incorrect_analysis">오답 분석</span>
-            </button>
-            <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="difficulty">
-                📈 <span data-i18n="difficulty_analysis">난이도 분석</span>
-            </button>
-            <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium" data-tab="cost">
-                💰 <span data-i18n="token_cost_analysis">토큰/비용 분석</span>
-            </button>
-        </nav>
+        <!-- 메인 컨텐츠 -->
+        <main class="main-content">
+            <!-- 헤더 -->
+            <header class="app-header">
+                <h1 class="app-title">
+                    <span class="icon">🎯</span>
+                    LLM 벤치마크 결과 시각화 도구
+                </h1>
+            </header>
 
-        <!-- 탭 컨텐츠 영역 -->
-        <div id="tabContent">
-            <!-- 전체 요약 탭 -->
-            <div id="tab-overview" class="tab-panel">
-                <!-- 메트릭 카드 -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    <div class="metric-card rounded-xl p-6 text-white">
-                        <p class="text-sm opacity-80" data-i18n="total_problems">총 문제 수</p>
-                        <p id="metricTotal" class="text-3xl font-bold mt-1">0</p>
+            <!-- 탭 네비게이션 -->
+            <nav class="tabs-container">
+                <div class="tabs">
+                    <button class="tab active" data-tab="overview">📊 전체 요약</button>
+                    <button class="tab" data-tab="model">🔍 모델별 비교</button>
+                    <button class="tab" data-tab="response">⏱️ 응답시간 분석</button>
+                    <button class="tab" data-tab="law">⚖️ 법령/비법령 분석</button>
+                    <button class="tab" data-tab="subject">📚 과목별 분석</button>
+                    <button class="tab" data-tab="year">📅 연도별 분석</button>
+                    <button class="tab" data-tab="incorrect">❌ 오답 분석</button>
+                    <button class="tab" data-tab="difficulty">📈 난이도 분석</button>
+                </div>
+            </nav>
+
+            <!-- 탭 컨텐츠 -->
+            <div id="tabContent">
+                <!-- 전체 요약 -->
+                <div id="tab-overview" class="tab-panel active">
+                    <h2 class="section-title">📊 전체 요약</h2>
+                    
+                    <h3 class="section-subtitle">📋 테스트셋 정보</h3>
+                    <div class="metrics-row">
+                        <div class="metric">
+                            <div class="metric-label">총 문제 수</div>
+                            <div class="metric-value" id="metricTotalProblems">0</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">평가 모델 수</div>
+                            <div class="metric-value" id="metricModelCount">0</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">총 평가 횟수</div>
+                            <div class="metric-value" id="metricTotalEval">0</div>
+                        </div>
                     </div>
-                    <div class="metric-card rounded-xl p-6 text-white" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
-                        <p class="text-sm opacity-80" data-i18n="accuracy">평균 정확도</p>
-                        <p id="metricAccuracy" class="text-3xl font-bold mt-1">0%</p>
+                    
+                    <h3 class="section-subtitle">🎯 모델 평균 성능</h3>
+                    <div class="metrics-row">
+                        <div class="metric">
+                            <div class="metric-label">평균 정확도</div>
+                            <div class="metric-value" id="metricAvgAccuracy">0%</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">모델당 평균 문제 수</div>
+                            <div class="metric-value" id="metricAvgProblems">0</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">평균 정답 수</div>
+                            <div class="metric-value" id="metricAvgCorrect">0</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">평균 오답 수</div>
+                            <div class="metric-value" id="metricAvgWrong">0</div>
+                        </div>
                     </div>
-                    <div class="metric-card rounded-xl p-6 text-white" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
-                        <p class="text-sm opacity-80" data-i18n="model">모델 수</p>
-                        <p id="metricModels" class="text-3xl font-bold mt-1">0</p>
+                    
+                    <h3 class="section-subtitle">📈 모델별 성능</h3>
+                    <div class="st-table-container">
+                        <table class="st-table" id="tableModelPerformance">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>모델</th>
+                                    <th>정답</th>
+                                    <th>총문제</th>
+                                    <th>정확도</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
                     </div>
-                    <div class="metric-card rounded-xl p-6 text-white" style="background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);">
-                        <p class="text-sm opacity-80" data-i18n="testname">테스트 수</p>
-                        <p id="metricTests" class="text-3xl font-bold mt-1">0</p>
+                    
+                    <h3 class="section-subtitle">🔥 모델 × 테스트셋 정답률 히트맵</h3>
+                    <div class="chart-container" id="chartHeatmap" style="height: 500px;"></div>
+                </div>
+
+                <!-- 모델별 비교 -->
+                <div id="tab-model" class="tab-panel">
+                    <h2 class="section-title">🔍 모델별 비교</h2>
+                    
+                    <h3 class="section-subtitle">📊 모델별 정확도 비교</h3>
+                    <div class="chart-container" id="chartModelComparison" style="height: 400px;"></div>
+                    
+                    <h3 class="section-subtitle">📋 모델별 상세 통계</h3>
+                    <div class="st-table-container">
+                        <table class="st-table" id="tableModelDetail">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>모델</th>
+                                    <th>정답</th>
+                                    <th>총문제</th>
+                                    <th>정확도</th>
+                                    <th>평균 응답시간</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
                     </div>
                 </div>
-                
-                <!-- 차트 영역 -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="glass-card rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">📊 모델별 정확도</h3>
-                        <div id="chartModelAccuracy" class="plotly-chart" style="height: 400px;"></div>
+
+                <!-- 응답시간 분석 -->
+                <div id="tab-response" class="tab-panel">
+                    <h2 class="section-title">⏱️ 응답시간 분석</h2>
+                    
+                    <h3 class="section-subtitle">📊 응답 시간 통계</h3>
+                    <div class="metrics-row">
+                        <div class="metric">
+                            <div class="metric-label">가장 빠른 모델</div>
+                            <div class="metric-value" id="metricFastestModel">-</div>
+                            <div class="metric-delta positive" id="metricFastestTime">↑ 0초</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">가장 느린 모델</div>
+                            <div class="metric-value" id="metricSlowestModel">-</div>
+                            <div class="metric-delta negative" id="metricSlowestTime">↑ 0초</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">평균 응답 시간</div>
+                            <div class="metric-value" id="metricAvgResponseTime">0초</div>
+                        </div>
                     </div>
-                    <div class="glass-card rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">🗂️ 테스트셋별 정확도</h3>
-                        <div id="chartTestAccuracy" class="plotly-chart" style="height: 400px;"></div>
+                    
+                    <div class="st-table-container">
+                        <table class="st-table" id="tableResponseTime">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>모델</th>
+                                    <th>평균</th>
+                                    <th>중앙값</th>
+                                    <th>표준편차</th>
+                                    <th>최소</th>
+                                    <th>최대</th>
+                                    <th>문제수</th>
+                                    <th>정확도</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    
+                    <h3 class="section-subtitle">📈 응답시간 vs 정확도</h3>
+                    <div class="chart-container" id="chartTimeVsAccuracy" style="height: 400px;"></div>
+                </div>
+
+                <!-- 법령/비법령 분석 -->
+                <div id="tab-law" class="tab-panel">
+                    <h2 class="section-title">⚖️ 법령/비법령 분석</h2>
+                    
+                    <div class="grid-2">
+                        <div>
+                            <h3 class="section-subtitle">📊 법령/비법령 문제 분포</h3>
+                            <div class="chart-container" id="chartLawDistribution" style="height: 350px;"></div>
+                        </div>
+                        <div>
+                            <h3 class="section-subtitle">📈 법령/비법령 정답률</h3>
+                            <div class="chart-container" id="chartLawAccuracy" style="height: 350px;"></div>
+                        </div>
+                    </div>
+                    
+                    <h3 class="section-subtitle">🤖 모델별 법령/비법령 성능</h3>
+                    <div class="chart-container" id="chartModelLawPerformance" style="height: 400px;"></div>
+                </div>
+
+                <!-- 과목별 분석 -->
+                <div id="tab-subject" class="tab-panel">
+                    <h2 class="section-title">📚 과목별 분석</h2>
+                    
+                    <div class="grid-2">
+                        <div>
+                            <div class="st-table-container">
+                                <table class="st-table" id="tableSubject">
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>과목</th>
+                                            <th>정답</th>
+                                            <th>총문제</th>
+                                            <th>정확도</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="section-subtitle">과목별 성능</h3>
+                            <div class="chart-container" id="chartSubjectAccuracy" style="height: 400px;"></div>
+                        </div>
                     </div>
                 </div>
-                
-                <!-- 히트맵 -->
-                <div class="glass-card rounded-xl p-6 mt-6">
-                    <h3 class="text-lg font-semibold mb-4">🔥 모델 × 테스트셋 정답률 히트맵</h3>
-                    <div id="chartHeatmap" class="plotly-chart" style="height: 600px;"></div>
+
+                <!-- 연도별 분석 -->
+                <div id="tab-year" class="tab-panel">
+                    <h2 class="section-title">📅 연도별 분석</h2>
+                    
+                    <div class="grid-2">
+                        <div>
+                            <h3 class="section-subtitle">연도별 문제 수</h3>
+                            <div class="chart-container" id="chartYearCount" style="height: 350px;"></div>
+                        </div>
+                        <div>
+                            <h3 class="section-subtitle">연도별 정답률 추이</h3>
+                            <div class="chart-container" id="chartYearAccuracy" style="height: 350px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 오답 분석 -->
+                <div id="tab-incorrect" class="tab-panel">
+                    <h2 class="section-title">❌ 오답 분석</h2>
+                    
+                    <h3 class="section-subtitle">📋 오답률 높은 문제 Top 20</h3>
+                    <div class="st-table-container">
+                        <table class="st-table" id="tableTopIncorrect">
+                            <thead>
+                                <tr>
+                                    <th>순위</th>
+                                    <th>테스트</th>
+                                    <th>과목</th>
+                                    <th>연도</th>
+                                    <th>오답 모델수</th>
+                                    <th>총 시도</th>
+                                    <th>오답률</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    
+                    <h3 class="section-subtitle">🔥 모델 간 오답 일치도</h3>
+                    <div class="chart-container" id="chartErrorAgreement" style="height: 500px;"></div>
+                </div>
+
+                <!-- 난이도 분석 -->
+                <div id="tab-difficulty" class="tab-panel">
+                    <h2 class="section-title">📈 난이도 분석</h2>
+                    
+                    <div class="grid-2">
+                        <div>
+                            <h3 class="section-subtitle">난이도 구간별 문제 분포</h3>
+                            <div class="chart-container" id="chartDifficultyDistribution" style="height: 350px;"></div>
+                        </div>
+                        <div>
+                            <h3 class="section-subtitle">모델별 난이도 구간 성능</h3>
+                            <div class="chart-container" id="chartModelDifficulty" style="height: 350px;"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
+        </main>
+    </div>
 
-            <!-- 모델별 비교 탭 -->
-            <div id="tab-model" class="tab-panel hidden">
-                <div class="glass-card rounded-xl p-6 mb-6">
-                    <h3 class="text-lg font-semibold mb-4">🤖 모델별 성능 비교</h3>
-                    <div id="chartModelComparison" class="plotly-chart" style="height: 500px;"></div>
-                </div>
-                <div class="glass-card rounded-xl p-6">
-                    <h3 class="text-lg font-semibold mb-4">📋 모델별 상세 통계</h3>
-                    <div id="tableModelStats" class="overflow-x-auto"></div>
-                </div>
-            </div>
-
-            <!-- 응답시간 분석 탭 -->
-            <div id="tab-response" class="tab-panel hidden">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <div class="glass-card rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">⏱️ 모델별 평균 응답시간</h3>
-                        <div id="chartResponseTime" class="plotly-chart" style="height: 400px;"></div>
-                    </div>
-                    <div class="glass-card rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">📈 응답시간 vs 정확도</h3>
-                        <div id="chartTimeVsAccuracy" class="plotly-chart" style="height: 400px;"></div>
-                    </div>
-                </div>
-                <div class="glass-card rounded-xl p-6">
-                    <h3 class="text-lg font-semibold mb-4">📊 응답시간 분포</h3>
-                    <div id="chartResponseDistribution" class="plotly-chart" style="height: 400px;"></div>
-                </div>
-            </div>
-
-            <!-- 법령/비법령 분석 탭 -->
-            <div id="tab-law" class="tab-panel hidden">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <div class="glass-card rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">⚖️ 법령/비법령 문제 분포</h3>
-                        <div id="chartLawDistribution" class="plotly-chart" style="height: 400px;"></div>
-                    </div>
-                    <div class="glass-card rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">📊 법령/비법령 정답률 비교</h3>
-                        <div id="chartLawAccuracy" class="plotly-chart" style="height: 400px;"></div>
-                    </div>
-                </div>
-                <div class="glass-card rounded-xl p-6">
-                    <h3 class="text-lg font-semibold mb-4">🤖 모델별 법령/비법령 성능</h3>
-                    <div id="chartModelLawPerformance" class="plotly-chart" style="height: 500px;"></div>
-                </div>
-            </div>
-
-            <!-- 과목별 분석 탭 -->
-            <div id="tab-subject" class="tab-panel hidden">
-                <div class="glass-card rounded-xl p-6 mb-6">
-                    <h3 class="text-lg font-semibold mb-4">📚 과목별 정답률</h3>
-                    <div id="chartSubjectAccuracy" class="plotly-chart" style="height: 500px;"></div>
-                </div>
-                <div class="glass-card rounded-xl p-6">
-                    <h3 class="text-lg font-semibold mb-4">📋 과목별 상세 통계</h3>
-                    <div id="tableSubjectStats" class="overflow-x-auto"></div>
-                </div>
-            </div>
-
-            <!-- 연도별 분석 탭 -->
-            <div id="tab-year" class="tab-panel hidden">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <div class="glass-card rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">📅 연도별 문제 수</h3>
-                        <div id="chartYearCount" class="plotly-chart" style="height: 400px;"></div>
-                    </div>
-                    <div class="glass-card rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">📈 연도별 정답률 추이</h3>
-                        <div id="chartYearAccuracy" class="plotly-chart" style="height: 400px;"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 오답 분석 탭 -->
-            <div id="tab-incorrect" class="tab-panel hidden">
-                <div class="glass-card rounded-xl p-6 mb-6">
-                    <h3 class="text-lg font-semibold mb-4">❌ 오답률 높은 문제 Top 20</h3>
-                    <div id="tableTopIncorrect" class="overflow-x-auto"></div>
-                </div>
-                <div class="glass-card rounded-xl p-6">
-                    <h3 class="text-lg font-semibold mb-4">🔥 모델 간 오답 일치도 히트맵</h3>
-                    <div id="chartErrorAgreement" class="plotly-chart" style="height: 600px;"></div>
-                </div>
-            </div>
-
-            <!-- 난이도 분석 탭 -->
-            <div id="tab-difficulty" class="tab-panel hidden">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <div class="glass-card rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">📈 난이도 구간별 문제 분포</h3>
-                        <div id="chartDifficultyDistribution" class="plotly-chart" style="height: 400px;"></div>
-                    </div>
-                    <div class="glass-card rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">🤖 모델별 난이도 구간 성능</h3>
-                        <div id="chartModelDifficulty" class="plotly-chart" style="height: 400px;"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 토큰/비용 분석 탭 -->
-            <div id="tab-cost" class="tab-panel hidden">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <div class="glass-card rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">🪙 모델별 토큰 사용량</h3>
-                        <div id="chartTokenUsage" class="plotly-chart" style="height: 400px;"></div>
-                    </div>
-                    <div class="glass-card rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">💰 비용 vs 정확도</h3>
-                        <div id="chartCostVsAccuracy" class="plotly-chart" style="height: 400px;"></div>
-                    </div>
-                </div>
-                <div class="glass-card rounded-xl p-6">
-                    <h3 class="text-lg font-semibold mb-4">📋 모델별 비용 효율성</h3>
-                    <div id="tableCostEfficiency" class="overflow-x-auto"></div>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <!-- 푸터 -->
-    <footer class="glass-card mt-12 px-6 py-4 text-center text-gray-400 text-sm">
-        <p>LLM Benchmark Visualizer | Data from <a href="https://github.com/big1248/benchmark_visualizer" class="text-blue-400 hover:underline" target="_blank">GitHub</a></p>
-    </footer>
-
-    <!-- 메인 스크립트 -->
     <script src="js/app.js"></script>
 </body>
 </html>

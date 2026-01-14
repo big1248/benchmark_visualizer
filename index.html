@@ -12,6 +12,7 @@
     <style>
         :root {
             --primary: #ff4b4b;
+            --primary-hover: #ff6b6b;
             --bg: #ffffff;
             --sidebar-bg: #f0f2f6;
             --text: #262730;
@@ -21,6 +22,8 @@
             --warning: #ffc107;
             --info: #0dcaf0;
             --danger: #dc3545;
+            --font-scale: 1;
+            --chart-font-scale: 1;
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -30,14 +33,15 @@
             background: var(--bg);
             color: var(--text);
             line-height: 1.6;
+            font-size: calc(14px * var(--font-scale));
         }
         
         .app { display: flex; min-height: 100vh; }
         
         /* 사이드바 */
         .sidebar {
-            width: 280px;
-            min-width: 280px;
+            width: 300px;
+            min-width: 300px;
             background: var(--sidebar-bg);
             padding: 1.5rem 1rem;
             border-right: 1px solid var(--border);
@@ -48,9 +52,9 @@
             top: 0;
         }
         
-        .sidebar-section { margin-bottom: 1.5rem; }
+        .sidebar-section { margin-bottom: 1.25rem; }
         .sidebar-title {
-            font-size: 0.9rem;
+            font-size: calc(0.95rem * var(--font-scale));
             font-weight: 600;
             color: var(--text);
             margin-bottom: 0.75rem;
@@ -63,15 +67,15 @@
             border: none;
             height: 1px;
             background: var(--border);
-            margin: 1.25rem 0;
+            margin: 1rem 0;
         }
         
-        .form-group { margin-bottom: 1rem; }
+        .form-group { margin-bottom: 0.9rem; }
         .form-group label {
             display: flex;
             align-items: center;
             gap: 0.25rem;
-            font-size: 0.85rem;
+            font-size: calc(0.85rem * var(--font-scale));
             color: var(--text-muted);
             margin-bottom: 0.35rem;
         }
@@ -95,7 +99,7 @@
             border: 1px solid var(--border);
             border-radius: 0.375rem;
             background: white;
-            font-size: 0.875rem;
+            font-size: calc(0.875rem * var(--font-scale));
             color: var(--text);
         }
         
@@ -116,39 +120,152 @@
         
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 14px;
-            height: 14px;
+            width: 16px;
+            height: 16px;
             background: var(--primary);
             border-radius: 50%;
             cursor: pointer;
         }
         
-        .slider-value {
-            font-size: 0.8rem;
-            color: var(--primary);
-            font-weight: 600;
-            text-align: right;
+        .slider-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-top: 0.25rem;
         }
         
-        .tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+        .slider-value {
+            font-size: calc(0.85rem * var(--font-scale));
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        /* 멀티셀렉트 태그 */
+        .multiselect-container { position: relative; }
+        
+        .multiselect-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-bottom: 0.5rem;
+            min-height: 28px;
+        }
+        
         .tag {
-            background: #e8eaed;
-            padding: 0.25rem 0.6rem;
-            border-radius: 1rem;
-            font-size: 0.8rem;
+            background: #e1e4e8;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.75rem;
+            font-size: calc(0.8rem * var(--font-scale));
             display: flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.3rem;
         }
-        .tag-remove { cursor: pointer; font-size: 1rem; line-height: 1; color: var(--text-muted); }
+        
+        .tag-remove {
+            cursor: pointer;
+            font-size: 1rem;
+            line-height: 1;
+            color: var(--text-muted);
+            font-weight: bold;
+        }
+        
         .tag-remove:hover { color: var(--primary); }
+        
+        .tag-all {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        /* 버튼 */
+        .btn {
+            width: 100%;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: calc(0.875rem * var(--font-scale));
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover { background: var(--primary-hover); }
+        
+        .btn-danger {
+            background: #fee2e2;
+            color: var(--danger);
+            padding: 0.3rem 0.5rem;
+            font-size: 0.8rem;
+        }
+        
+        .btn-danger:hover { background: #fecaca; }
+        
+        /* 확장 패널 */
+        .expander {
+            border: 1px solid var(--border);
+            border-radius: 0.375rem;
+            margin-bottom: 0.75rem;
+            background: white;
+        }
+        
+        .expander-header {
+            padding: 0.6rem 0.75rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: calc(0.9rem * var(--font-scale));
+            font-weight: 500;
+        }
+        
+        .expander-header:hover { background: #f8f9fa; }
+        
+        .expander-arrow { transition: transform 0.2s; }
+        .expander.open .expander-arrow { transform: rotate(180deg); }
+        
+        .expander-content {
+            padding: 0.75rem;
+            display: none;
+            border-top: 1px solid var(--border);
+        }
+        
+        .expander.open .expander-content { display: block; }
+        
+        /* 앙상블 아이템 */
+        .ensemble-item {
+            background: #f8f9fa;
+            padding: 0.6rem;
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        
+        .ensemble-info { flex: 1; }
+        .ensemble-name { font-weight: 600; font-size: calc(0.9rem * var(--font-scale)); }
+        .ensemble-meta { font-size: calc(0.8rem * var(--font-scale)); color: var(--text-muted); }
+        
+        /* 상태 메시지 */
+        .status-box {
+            padding: 0.6rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: calc(0.85rem * var(--font-scale));
+            margin-top: 0.75rem;
+        }
+        
+        .status-info { background: #cfe2ff; color: #084298; }
+        .status-success { background: #d1e7dd; color: #0f5132; }
+        .status-warning { background: #fff3cd; color: #664d03; }
         
         .data-status {
             background: #e8f4f8;
             padding: 0.75rem;
             border-radius: 0.375rem;
-            font-size: 0.85rem;
+            font-size: calc(0.85rem * var(--font-scale));
             color: #0068c9;
             margin-top: 1rem;
         }
@@ -156,14 +273,14 @@
         /* 메인 */
         .main {
             flex: 1;
-            margin-left: 280px;
+            margin-left: 300px;
             padding: 2rem 2.5rem;
-            max-width: calc(100% - 280px);
+            max-width: calc(100% - 300px);
         }
         
         .header { margin-bottom: 1.5rem; }
         .title {
-            font-size: 2rem;
+            font-size: calc(2rem * var(--font-scale));
             font-weight: 700;
             display: flex;
             align-items: center;
@@ -181,10 +298,10 @@
         }
         
         .tab-btn {
-            padding: 0.75rem 0.9rem;
+            padding: 0.75rem 1rem;
             background: none;
             border: none;
-            font-size: 0.85rem;
+            font-size: calc(0.9rem * var(--font-scale));
             color: var(--text-muted);
             cursor: pointer;
             position: relative;
@@ -210,7 +327,7 @@
         /* 섹션 */
         .section { margin-bottom: 2rem; }
         .section-title {
-            font-size: 1.4rem;
+            font-size: calc(1.4rem * var(--font-scale));
             font-weight: 600;
             margin-bottom: 1rem;
             display: flex;
@@ -218,7 +335,7 @@
             gap: 0.5rem;
         }
         .section-subtitle {
-            font-size: 1.1rem;
+            font-size: calc(1.1rem * var(--font-scale));
             font-weight: 600;
             margin: 1.5rem 0 1rem;
             display: flex;
@@ -230,24 +347,29 @@
         /* 메트릭 */
         .metrics { display: flex; flex-wrap: wrap; gap: 2rem; margin-bottom: 1.5rem; }
         .metric { min-width: 120px; }
-        .metric-label { font-size: 0.875rem; color: var(--text-muted); margin-bottom: 0.25rem; }
-        .metric-value { font-size: 1.75rem; font-weight: 700; color: var(--text); }
-        .metric-delta { font-size: 0.85rem; margin-top: 0.1rem; }
+        .metric-label { font-size: calc(0.875rem * var(--font-scale)); color: var(--text-muted); margin-bottom: 0.25rem; }
+        .metric-value { font-size: calc(1.75rem * var(--font-scale)); font-weight: 700; color: var(--text); }
+        .metric-delta { font-size: calc(0.85rem * var(--font-scale)); margin-top: 0.1rem; }
         .metric-delta.up { color: var(--success); }
-        .metric-delta.down { color: var(--primary); }
+        .metric-delta.down { color: var(--danger); }
         
         /* 그리드 */
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
         .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; }
         .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
         
-        @media (max-width: 1024px) {
+        @media (max-width: 1200px) {
+            .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 900px) {
             .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+            .sidebar { width: 260px; min-width: 260px; }
+            .main { margin-left: 260px; max-width: calc(100% - 260px); }
         }
         
         /* 테이블 */
         .table-wrap { overflow-x: auto; margin-bottom: 1rem; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        table { width: 100%; border-collapse: collapse; font-size: calc(0.875rem * var(--font-scale)); }
         th {
             text-align: left;
             padding: 0.75rem;
@@ -273,7 +395,7 @@
             padding: 1rem;
             border-radius: 0.375rem;
             margin-bottom: 1rem;
-            font-size: 0.9rem;
+            font-size: calc(0.9rem * var(--font-scale));
             line-height: 1.6;
         }
         .alert-info { background: #e8f4f8; border-left: 4px solid var(--info); color: #0c5460; }
@@ -313,28 +435,6 @@
         .progress-fill { height: 100%; background: var(--primary); width: 0%; transition: width 0.3s; }
         
         .hidden { display: none !important; }
-        
-        /* 확장 패널 */
-        .expander {
-            border: 1px solid var(--border);
-            border-radius: 0.375rem;
-            margin-bottom: 0.5rem;
-        }
-        .expander-header {
-            padding: 0.75rem 1rem;
-            background: #fafafa;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: 500;
-        }
-        .expander-content {
-            padding: 1rem;
-            display: none;
-            border-top: 1px solid var(--border);
-        }
-        .expander.open .expander-content { display: block; }
     </style>
 </head>
 <body>
@@ -348,6 +448,7 @@
     <div class="app">
         <!-- 사이드바 -->
         <aside class="sidebar">
+            <!-- 언어 선택 -->
             <div class="sidebar-section">
                 <div class="form-group">
                     <label>Language / 언어</label>
@@ -360,91 +461,179 @@
             
             <hr>
             
+            <!-- 화면 설정 -->
             <div class="sidebar-section">
-                <div class="sidebar-title">⚙️ 화면 설정</div>
+                <div class="sidebar-title">⚙️ <span data-t="display_settings">화면 설정</span></div>
+                
                 <div class="form-group">
-                    <label>화면 폰트 크기 <span class="help-icon" title="화면 전체 폰트 크기">?</span></label>
-                    <input type="range" id="fontSlider" min="0.8" max="1.5" step="0.05" value="1.0">
-                    <div class="slider-value" id="fontValue">1.00</div>
+                    <label><span data-t="font_size">화면 폰트 크기</span> <span class="help-icon" title="화면 전체의 폰트 크기를 조절합니다">?</span></label>
+                    <input type="range" id="fontSlider" min="0.8" max="1.5" step="0.1" value="1.0">
+                    <div class="slider-row">
+                        <span style="font-size:0.75rem;color:var(--text-muted)">0.8</span>
+                        <span class="slider-value" id="fontValue">1.0</span>
+                        <span style="font-size:0.75rem;color:var(--text-muted)">1.5</span>
+                    </div>
                 </div>
+                
                 <div class="form-group">
-                    <label>차트 텍스트 크기 <span class="help-icon" title="차트 내 텍스트 크기">?</span></label>
-                    <input type="range" id="chartSlider" min="0.8" max="1.5" step="0.05" value="1.0">
-                    <div class="slider-value" id="chartValue">1.00</div>
+                    <label><span data-t="chart_text_size">차트 텍스트 크기</span> <span class="help-icon" title="차트 내부 텍스트, 숫자, 레이블 크기를 조절합니다">?</span></label>
+                    <input type="range" id="chartSlider" min="0.7" max="1.8" step="0.1" value="1.0">
+                    <div class="slider-row">
+                        <span style="font-size:0.75rem;color:var(--text-muted)">0.7</span>
+                        <span class="slider-value" id="chartValue">1.0</span>
+                        <span style="font-size:0.75rem;color:var(--text-muted)">1.8</span>
+                    </div>
                 </div>
             </div>
             
             <hr>
             
+            <!-- 필터 옵션 -->
             <div class="sidebar-section">
-                <div class="sidebar-title">🔍 필터 옵션</div>
+                <div class="sidebar-title">🔍 <span data-t="filters">필터 옵션</span></div>
+                
+                <!-- 테스트명 -->
                 <div class="form-group">
-                    <label>테스트명 <span class="help-icon" title="분석할 테스트 선택">?</span></label>
-                    <div class="tags" id="testTags"></div>
-                    <select id="testSelect" style="margin-top:0.5rem;"><option value="">+ 테스트 추가</option></select>
+                    <label><span data-t="testname">테스트명</span> <span class="help-icon" title="여러 테스트를 선택할 수 있습니다">?</span></label>
+                    <div class="multiselect-container">
+                        <div class="multiselect-tags" id="testTags"></div>
+                        <select id="testSelect"><option value="">+ 테스트 추가</option></select>
+                    </div>
                 </div>
+                
+                <!-- 모델 -->
                 <div class="form-group">
-                    <label>모델</label>
-                    <select id="modelSelect"><option value="all">전체</option></select>
+                    <label><span data-t="model">모델</span></label>
+                    <div class="multiselect-container">
+                        <div class="multiselect-tags" id="modelTags"></div>
+                        <select id="modelSelect"><option value="">+ 모델 추가</option></select>
+                    </div>
                 </div>
+                
+                <!-- 상세도 -->
                 <div class="form-group">
-                    <label>상세도</label>
-                    <select id="detailSelect"><option value="all">전체</option></select>
+                    <label><span data-t="detail_type">상세도</span> <span class="help-icon" title="여러 상세도를 선택할 수 있습니다">?</span></label>
+                    <div class="multiselect-container">
+                        <div class="multiselect-tags" id="detailTags"></div>
+                        <select id="detailSelect"><option value="">+ 상세도 추가</option></select>
+                    </div>
                 </div>
+                
+                <!-- 프롬프팅 방식 -->
                 <div class="form-group">
-                    <label>프롬프팅 방식</label>
-                    <select id="promptSelect"><option value="all">전체</option></select>
+                    <label><span data-t="prompting">프롬프팅 방식</span> <span class="help-icon" title="여러 프롬프팅 방식을 선택할 수 있습니다">?</span></label>
+                    <div class="multiselect-container">
+                        <div class="multiselect-tags" id="promptTags"></div>
+                        <select id="promptSelect"><option value="">+ 프롬프팅 추가</option></select>
+                    </div>
                 </div>
+                
+                <!-- 연도 -->
                 <div class="form-group">
-                    <label>문제 유형</label>
+                    <label><span data-t="year">연도</span></label>
+                    <div class="multiselect-container">
+                        <div class="multiselect-tags" id="yearTags"></div>
+                        <select id="yearSelect"><option value="">+ 연도 추가</option></select>
+                    </div>
+                </div>
+                
+                <!-- 문제 유형 -->
+                <div class="form-group">
+                    <label><span data-t="problem_type">문제 유형</span></label>
                     <select id="typeSelect">
-                        <option value="all">전체</option>
-                        <option value="text">텍스트만</option>
-                        <option value="image">이미지 포함</option>
+                        <option value="all" data-t="all">전체</option>
+                        <option value="image" data-t="image_problem">이미지 포함</option>
+                        <option value="text" data-t="text_only">텍스트만</option>
                     </select>
                 </div>
+                
+                <!-- 법령 구분 -->
                 <div class="form-group">
-                    <label>법령 구분</label>
+                    <label><span data-t="law_type">법령 구분</span></label>
                     <select id="lawSelect">
-                        <option value="all">전체</option>
-                        <option value="O">법령</option>
-                        <option value="X">비법령</option>
+                        <option value="all" data-t="all">전체</option>
+                        <option value="O" data-t="law">법령</option>
+                        <option value="X" data-t="non_law">비법령</option>
                     </select>
                 </div>
             </div>
             
-            <div class="data-status">📊 현재 표시 중인 데이터: <strong id="dataCount">0</strong>개</div>
+            <hr>
+            
+            <!-- 앙상블 모델 관리 -->
+            <div class="sidebar-section">
+                <div class="sidebar-title">🎯 <span data-t="ensemble_management">앙상블 모델 관리</span></div>
+                
+                <div class="expander" id="ensembleExpander">
+                    <div class="expander-header" onclick="toggleExpander('ensembleExpander')">
+                        <span>➕ <span data-t="create_ensemble">앙상블 생성</span></span>
+                        <span class="expander-arrow">▼</span>
+                    </div>
+                    <div class="expander-content">
+                        <div class="form-group">
+                            <label><span data-t="ensemble_name">앙상블 이름</span></label>
+                            <input type="text" id="ensembleName" placeholder="예: GPT 앙상블">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label><span data-t="select_models">모델 선택</span> <span class="help-icon" title="최소 2개 이상의 모델을 선택해야 합니다">?</span></label>
+                            <div class="multiselect-tags" id="ensembleModelTags"></div>
+                            <select id="ensembleModelSelect"><option value="">+ 모델 추가</option></select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label><span data-t="ensemble_method">앙상블 방법</span></label>
+                            <select id="ensembleMethod">
+                                <option value="majority" data-t="majority_voting">다수결 투표</option>
+                                <option value="weighted" data-t="weighted_voting">가중 투표</option>
+                            </select>
+                        </div>
+                        
+                        <button class="btn btn-primary" onclick="addEnsemble()">✅ <span data-t="add_ensemble">앙상블 추가</span></button>
+                    </div>
+                </div>
+                
+                <div id="ensembleList"></div>
+                
+                <div class="status-box status-info" id="ensembleStatus">
+                    <span data-t="no_ensembles">생성된 앙상블이 없습니다</span>
+                </div>
+            </div>
+            
+            <div class="data-status">
+                📊 <span data-t="current_data">현재 표시 중인 데이터</span>: <strong id="dataCount">0</strong><span data-t="problems">개 문제</span>
+            </div>
         </aside>
 
         <!-- 메인 -->
         <main class="main">
             <header class="header">
-                <h1 class="title">🎯 LLM 벤치마크 결과 시각화 도구</h1>
+                <h1 class="title">🎯 <span data-t="title">LLM 벤치마크 결과 시각화 도구</span></h1>
             </header>
 
             <!-- 탭 -->
             <nav class="tabs-nav">
-                <button class="tab-btn active" data-tab="overview">📊 전체 요약</button>
-                <button class="tab-btn" data-tab="model">🔍 모델별 비교</button>
-                <button class="tab-btn" data-tab="time">⏱️ 응답시간 분석</button>
-                <button class="tab-btn" data-tab="law">⚖️ 법령/비법령 분석</button>
-                <button class="tab-btn" data-tab="subject">📚 과목별 분석</button>
-                <button class="tab-btn" data-tab="year">📅 연도별 분석</button>
-                <button class="tab-btn" data-tab="error">❌ 오답 분석</button>
-                <button class="tab-btn" data-tab="diff">📈 난이도 분석</button>
-                <button class="tab-btn" data-tab="cost">💰 토큰/비용 분석</button>
-                <button class="tab-btn" data-tab="testset">📋 테스트셋 통계</button>
+                <button class="tab-btn active" data-tab="overview">📊 <span data-t="overview">전체 요약</span></button>
+                <button class="tab-btn" data-tab="model">🔍 <span data-t="model_comparison">모델별 비교</span></button>
+                <button class="tab-btn" data-tab="time">⏱️ <span data-t="response_time_analysis">응답시간 분석</span></button>
+                <button class="tab-btn" data-tab="law">⚖️ <span data-t="law_analysis">법령/비법령 분석</span></button>
+                <button class="tab-btn" data-tab="subject">📚 <span data-t="subject_analysis">과목별 분석</span></button>
+                <button class="tab-btn" data-tab="year">📅 <span data-t="year_analysis">연도별 분석</span></button>
+                <button class="tab-btn" data-tab="error">❌ <span data-t="incorrect_analysis">오답 분석</span></button>
+                <button class="tab-btn" data-tab="diff">📈 <span data-t="difficulty_analysis">난이도 분석</span></button>
+                <button class="tab-btn" data-tab="cost">💰 <span data-t="token_cost_analysis">토큰/비용 분석</span></button>
+                <button class="tab-btn" data-tab="testset">📋 <span data-t="testset_stats">테스트셋 통계</span></button>
                 <button class="tab-btn" data-tab="extra">📑 추가 분석</button>
             </nav>
 
             <div id="content">
                 <!-- 전체 요약 -->
                 <div id="tab-overview" class="tab-panel active">
-                    <h2 class="section-title">📊 전체 요약</h2>
+                    <h2 class="section-title">📊 <span data-t="overview">전체 요약</span></h2>
                     
                     <h3 class="section-subtitle">📋 테스트셋 정보</h3>
                     <div class="metrics grid-3">
-                        <div class="metric"><div class="metric-label">총 문제 수</div><div class="metric-value" id="m-total">0</div></div>
+                        <div class="metric"><div class="metric-label" data-t="total_problems">총 문제 수</div><div class="metric-value" id="m-total">0</div></div>
                         <div class="metric"><div class="metric-label">평가 모델 수</div><div class="metric-value" id="m-models">0</div></div>
                         <div class="metric"><div class="metric-label">총 평가 횟수</div><div class="metric-value" id="m-evals">0</div></div>
                     </div>
@@ -463,9 +652,9 @@
                     
                     <h3 class="section-subtitle">⚖️ 법령/비법령 분석</h3>
                     <div class="metrics grid-4">
-                        <div class="metric"><div class="metric-label">법령 문제 수</div><div class="metric-value" id="m-law">0</div></div>
+                        <div class="metric"><div class="metric-label" data-t="law_problems">법령 문제 수</div><div class="metric-value" id="m-law">0</div></div>
                         <div class="metric"><div class="metric-label">법령 정답률</div><div class="metric-value" id="m-lawacc">0%</div></div>
-                        <div class="metric"><div class="metric-label">비법령 문제 수</div><div class="metric-value" id="m-nonlaw">0</div></div>
+                        <div class="metric"><div class="metric-label" data-t="non_law_problems">비법령 문제 수</div><div class="metric-value" id="m-nonlaw">0</div></div>
                         <div class="metric"><div class="metric-label">비법령 정답률</div><div class="metric-value" id="m-nonlawacc">0%</div></div>
                     </div>
                     
@@ -477,116 +666,117 @@
                         <div class="chart" id="chart-lawcomp"></div>
                     </div>
                     
-                    <h3 class="section-subtitle">📈 모델별 성능</h3>
+                    <h3 class="section-subtitle">📈 <span data-t="performance_by_model">모델별 성능 지표</span></h3>
                     <div class="table-wrap">
                         <table id="tbl-perf">
-                            <thead><tr><th></th><th>모델</th><th>정답</th><th>총문제</th><th>정확도</th><th>오답</th></tr></thead>
+                            <thead><tr><th></th><th data-t="model">모델</th><th data-t="correct">정답</th><th>총문제</th><th data-t="accuracy">정확도</th><th data-t="wrong">오답</th></tr></thead>
                             <tbody></tbody>
                         </table>
                     </div>
                     
-                    <h3 class="section-subtitle">🔥 모델 × 테스트셋 정답률 히트맵</h3>
+                    <h3 class="section-subtitle">🔥 <span data-t="heatmap">모델별 테스트셋 정답도 히트맵</span></h3>
                     <div class="chart" id="chart-heatmap" style="height:500px;"></div>
                     <div class="alert alert-info" id="heatmap-insight"></div>
                 </div>
 
                 <!-- 모델별 비교 -->
                 <div id="tab-model" class="tab-panel">
-                    <h2 class="section-title">🔍 모델별 비교</h2>
-                    <h3 class="section-subtitle">📈 모델별 성능 지표</h3>
+                    <h2 class="section-title">🔍 <span data-t="model_comparison">모델별 비교</span></h2>
+                    <h3 class="section-subtitle">📈 <span data-t="performance_by_model">모델별 성능 지표</span></h3>
                     <div class="table-wrap">
-                        <table id="tbl-model"><thead><tr><th></th><th>모델</th><th>정답</th><th>총문제</th><th>정확도</th><th>오답</th></tr></thead><tbody></tbody></table>
+                        <table id="tbl-model"><thead><tr><th></th><th data-t="model">모델</th><th data-t="correct">정답</th><th>총문제</th><th data-t="accuracy">정확도</th><th data-t="wrong">오답</th></tr></thead><tbody></tbody></table>
                     </div>
                     <div class="divider"></div>
-                    <h3 class="section-subtitle">📊 비교 차트</h3>
+                    <h3 class="section-subtitle">📊 <span data-t="comparison_chart">비교 차트</span></h3>
                     <div class="grid-2">
                         <div class="chart" id="chart-modelbar"></div>
                         <div class="chart" id="chart-modelstack"></div>
                     </div>
-                    <h3 class="section-subtitle">🔥 모델 × 테스트셋 정답률 히트맵</h3>
+                    <h3 class="section-subtitle">🔥 <span data-t="heatmap">모델별 테스트셋 정답도 히트맵</span></h3>
                     <div class="chart" id="chart-heatmap2" style="height:450px;"></div>
                 </div>
 
                 <!-- 응답시간 분석 -->
                 <div id="tab-time" class="tab-panel">
-                    <h2 class="section-title">⏱️ 응답시간 분석</h2>
-                    <h3 class="section-subtitle">📊 응답 시간 통계</h3>
+                    <h2 class="section-title">⏱️ <span data-t="response_time_analysis">응답시간 분석</span></h2>
+                    <h3 class="section-subtitle">📊 <span data-t="response_time_stats">응답 시간 통계</span></h3>
                     <div class="metrics grid-3">
-                        <div class="metric"><div class="metric-label">가장 빠른 모델</div><div class="metric-value" id="m-fastest">-</div><div class="metric-delta up" id="m-fastestT"></div></div>
-                        <div class="metric"><div class="metric-label">가장 느린 모델</div><div class="metric-value" id="m-slowest">-</div><div class="metric-delta down" id="m-slowestT"></div></div>
-                        <div class="metric"><div class="metric-label">평균 응답 시간</div><div class="metric-value" id="m-avgtime">0초</div></div>
+                        <div class="metric"><div class="metric-label" data-t="fastest_model">가장 빠른 모델</div><div class="metric-value" id="m-fastest">-</div><div class="metric-delta up" id="m-fastestT"></div></div>
+                        <div class="metric"><div class="metric-label" data-t="slowest_model">가장 느린 모델</div><div class="metric-value" id="m-slowest">-</div><div class="metric-delta down" id="m-slowestT"></div></div>
+                        <div class="metric"><div class="metric-label" data-t="avg_response_time">평균 응답 시간</div><div class="metric-value" id="m-avgtime">0초</div></div>
                     </div>
                     <div class="table-wrap">
-                        <table id="tbl-time"><thead><tr><th></th><th>모델</th><th>평균</th><th>중앙값</th><th>표준편차</th><th>최소</th><th>최대</th><th>문제수</th><th>정확도</th></tr></thead><tbody></tbody></table>
+                        <table id="tbl-time"><thead><tr><th></th><th data-t="model">모델</th><th>평균</th><th>중앙값</th><th>표준편차</th><th>최소</th><th>최대</th><th data-t="problem_count">문제수</th><th data-t="accuracy">정확도</th></tr></thead><tbody></tbody></table>
                     </div>
                     <div class="divider"></div>
                     <div class="grid-2">
-                        <div><h3 class="section-subtitle">📊 모델별 평균 응답시간</h3><div class="chart" id="chart-timebar"></div></div>
-                        <div><h3 class="section-subtitle">📦 응답시간 분포 (박스플롯)</h3><div class="chart" id="chart-timebox"></div></div>
+                        <div><h3 class="section-subtitle">📊 <span data-t="response_time_by_model">모델별 평균 응답시간</span></h3><div class="chart" id="chart-timebar"></div></div>
+                        <div><h3 class="section-subtitle">📦 <span data-t="response_time_distribution">응답시간 분포</span></h3><div class="chart" id="chart-timebox"></div></div>
                     </div>
-                    <h3 class="section-subtitle">📈 응답시간 vs 정확도</h3>
+                    <h3 class="section-subtitle">📈 <span data-t="response_time_vs_accuracy">응답시간 vs 정확도</span></h3>
                     <div class="chart" id="chart-timescatter"></div>
                     <div class="alert alert-info" id="time-insight"></div>
                 </div>
 
                 <!-- 법령/비법령 -->
                 <div id="tab-law" class="tab-panel">
-                    <h2 class="section-title">⚖️ 법령/비법령 분석</h2>
-                    <h3 class="section-subtitle">📊 법령/비법령 전체 통계</h3>
+                    <h2 class="section-title">⚖️ <span data-t="law_analysis">법령/비법령 분석</span></h2>
+                    <h3 class="section-subtitle">📊 <span data-t="law_ratio">법령/비법령 전체 통계</span></h3>
                     <div class="grid-2">
                         <div class="chart" id="chart-lawpie"></div>
-                        <div class="metrics" style="align-items:center;">
-                            <div class="metric"><div class="metric-label">법령 문제</div><div class="metric-value" id="m-law2">0</div></div>
-                            <div class="metric"><div class="metric-label">비법령 문제</div><div class="metric-value" id="m-nonlaw2">0</div></div>
+                        <div class="metrics" style="align-items:center;justify-content:center;">
+                            <div class="metric"><div class="metric-label" data-t="law_problems">법령 문제</div><div class="metric-value" id="m-law2">0</div></div>
+                            <div class="metric"><div class="metric-label" data-t="non_law_problems">비법령 문제</div><div class="metric-value" id="m-nonlaw2">0</div></div>
                         </div>
                     </div>
                     <div class="divider"></div>
-                    <h3 class="section-subtitle">📊 모델별 법령/비법령 성능</h3>
+                    <h3 class="section-subtitle">📊 <span data-t="model_law_performance">모델별 법령/비법령 성능 비교</span></h3>
                     <div class="chart" id="chart-lawmodel"></div>
                 </div>
 
                 <!-- 과목별 -->
                 <div id="tab-subject" class="tab-panel">
-                    <h2 class="section-title">📚 과목별 분석</h2>
+                    <h2 class="section-title">📚 <span data-t="subject_analysis">과목별 분석</span></h2>
                     <div class="grid-2">
                         <div>
+                            <h3 class="section-subtitle">📋 <span data-t="subject_performance">과목별 성능</span></h3>
                             <div class="table-wrap">
-                                <table id="tbl-subject"><thead><tr><th></th><th>과목</th><th>정답</th><th>총문제</th><th>정확도</th></tr></thead><tbody></tbody></table>
+                                <table id="tbl-subject"><thead><tr><th></th><th>과목</th><th data-t="correct">정답</th><th>총문제</th><th data-t="accuracy">정확도</th></tr></thead><tbody></tbody></table>
                             </div>
                         </div>
-                        <div><h3 class="section-subtitle">과목별 성능</h3><div class="chart" id="chart-subject"></div></div>
+                        <div><h3 class="section-subtitle">📊 과목별 정답률</h3><div class="chart" id="chart-subject"></div></div>
                     </div>
                 </div>
 
                 <!-- 연도별 -->
                 <div id="tab-year" class="tab-panel">
-                    <h2 class="section-title">📅 연도별 분석</h2>
+                    <h2 class="section-title">📅 <span data-t="year_analysis">연도별 분석</span></h2>
                     <div class="grid-2">
-                        <div><h3 class="section-subtitle">연도별 문제 수</h3><div class="chart" id="chart-yearcount"></div></div>
-                        <div><h3 class="section-subtitle">연도별 정답률 추이</h3><div class="chart" id="chart-yearacc"></div></div>
+                        <div><h3 class="section-subtitle"><span data-t="year_problem_chart">연도별 문제 수</span></h3><div class="chart" id="chart-yearcount"></div></div>
+                        <div><h3 class="section-subtitle"><span data-t="year_performance">연도별 정답률 추이</span></h3><div class="chart" id="chart-yearacc"></div></div>
                     </div>
                 </div>
 
                 <!-- 오답 분석 -->
                 <div id="tab-error" class="tab-panel">
-                    <h2 class="section-title">❌ 오답 분석</h2>
+                    <h2 class="section-title">❌ <span data-t="incorrect_analysis">오답 분석</span></h2>
                     
-                    <h3 class="section-subtitle">📊 오답률 높은 문제 Top 20</h3>
+                    <h3 class="section-subtitle">📊 <span data-t="top_incorrect">오답률 높은 문제 Top 20</span></h3>
                     <div class="table-wrap">
-                        <table id="tbl-error"><thead><tr><th>순위</th><th>테스트</th><th>과목</th><th>연도</th><th>오답 모델수</th><th>총 모델수</th><th>오답률</th></tr></thead><tbody></tbody></table>
+                        <table id="tbl-error"><thead><tr><th>순위</th><th data-t="test_info">테스트</th><th>과목</th><th data-t="year">연도</th><th data-t="incorrect_count">오답 모델수</th><th data-t="total_models">총 모델수</th><th data-t="wrong_rate">오답률</th></tr></thead><tbody></tbody></table>
                     </div>
                     
                     <div class="divider"></div>
                     
-                    <h3 class="section-subtitle">🚨 모든 모델이 틀린 문제 (완전 공통 오답)</h3>
+                    <h3 class="section-subtitle">🚨 <span data-t="all_models_incorrect">모든 모델이 틀린 문제</span></h3>
                     <div id="all-wrong-alert"></div>
                     <div class="table-wrap">
-                        <table id="tbl-allwrong"><thead><tr><th>문제 번호</th><th>테스트</th><th>과목</th><th>연도</th><th>오답 모델수</th></tr></thead><tbody></tbody></table>
+                        <table id="tbl-allwrong"><thead><tr><th data-t="problem_id">문제 번호</th><th data-t="test_info">테스트</th><th>과목</th><th data-t="year">연도</th><th data-t="incorrect_count">오답 모델수</th></tr></thead><tbody></tbody></table>
                     </div>
                     
                     <div class="divider"></div>
                     
-                    <h3 class="section-subtitle">⚠️ 대부분 모델이 틀린 문제 (≥50%)</h3>
+                    <h3 class="section-subtitle">⚠️ <span data-t="most_models_incorrect">대부분 모델이 틀린 문제 (≥50%)</span></h3>
                     <div id="most-wrong-alert"></div>
                     
                     <div class="divider"></div>
@@ -602,9 +792,9 @@
 
                 <!-- 난이도 -->
                 <div id="tab-diff" class="tab-panel">
-                    <h2 class="section-title">📈 난이도 분석</h2>
+                    <h2 class="section-title">📈 <span data-t="difficulty_analysis">난이도 분석</span></h2>
                     
-                    <h3 class="section-subtitle">📊 난이도 분포</h3>
+                    <h3 class="section-subtitle">📊 <span data-t="problem_distribution">난이도 구간별 문제 분포</span></h3>
                     <div class="grid-2">
                         <div><div class="chart" id="chart-diffdist"></div></div>
                         <div><div class="chart" id="chart-diffmodel"></div></div>
@@ -615,16 +805,16 @@
                     <h3 class="section-subtitle">🔍 어려운 문제 vs 쉬운 문제 비교</h3>
                     <div class="grid-2">
                         <div>
-                            <h4 style="color:var(--danger);margin-bottom:0.5rem;">매우 어려운 문제 (정답률 &lt; 20%)</h4>
+                            <h4 style="color:var(--danger);margin-bottom:0.5rem;"><span data-t="very_hard">매우 어려운 문제</span> (정답률 &lt; 20%)</h4>
                             <div class="metrics">
-                                <div class="metric"><div class="metric-label">문제 수</div><div class="metric-value" id="m-veryhard">0</div></div>
+                                <div class="metric"><div class="metric-label" data-t="problem_count">문제 수</div><div class="metric-value" id="m-veryhard">0</div></div>
                                 <div class="metric"><div class="metric-label">평균 정답률</div><div class="metric-value" id="m-veryhardacc">0%</div></div>
                             </div>
                         </div>
                         <div>
-                            <h4 style="color:var(--success);margin-bottom:0.5rem;">매우 쉬운 문제 (정답률 &gt; 80%)</h4>
+                            <h4 style="color:var(--success);margin-bottom:0.5rem;"><span data-t="very_easy">매우 쉬운 문제</span> (정답률 &gt; 80%)</h4>
                             <div class="metrics">
-                                <div class="metric"><div class="metric-label">문제 수</div><div class="metric-value" id="m-veryeasy">0</div></div>
+                                <div class="metric"><div class="metric-label" data-t="problem_count">문제 수</div><div class="metric-value" id="m-veryeasy">0</div></div>
                                 <div class="metric"><div class="metric-label">평균 정답률</div><div class="metric-value" id="m-veryeasyacc">0%</div></div>
                             </div>
                         </div>
@@ -640,42 +830,42 @@
 
                 <!-- 토큰/비용 -->
                 <div id="tab-cost" class="tab-panel">
-                    <h2 class="section-title">💰 토큰/비용 분석</h2>
+                    <h2 class="section-title">💰 <span data-t="token_cost_analysis">토큰 및 비용 분석</span></h2>
                     
-                    <h3 class="section-subtitle">📊 토큰 사용량 통계</h3>
+                    <h3 class="section-subtitle">📊 <span data-t="token_stats">토큰 사용량 통계</span></h3>
                     <div class="metrics grid-4">
-                        <div class="metric"><div class="metric-label">총 토큰</div><div class="metric-value" id="m-totaltoken">0</div></div>
-                        <div class="metric"><div class="metric-label">평균 입력 토큰</div><div class="metric-value" id="m-intoken">0</div></div>
-                        <div class="metric"><div class="metric-label">평균 출력 토큰</div><div class="metric-value" id="m-outtoken">0</div></div>
-                        <div class="metric"><div class="metric-label">입/출력 비율</div><div class="metric-value" id="m-ioratio">0:1</div></div>
+                        <div class="metric"><div class="metric-label" data-t="total_tokens">총 토큰</div><div class="metric-value" id="m-totaltoken">0</div></div>
+                        <div class="metric"><div class="metric-label" data-t="avg_tokens_per_problem">문제당 평균 토큰</div><div class="metric-value" id="m-avgtoken">0</div></div>
+                        <div class="metric"><div class="metric-label" data-t="io_ratio">입출력 토큰 비율</div><div class="metric-value" id="m-ioratio">0:1</div></div>
+                        <div class="metric"><div class="metric-label" data-t="most_efficient">가장 효율적인 모델</div><div class="metric-value" id="m-efficient">-</div></div>
                     </div>
                     
                     <div class="divider"></div>
                     
                     <h3 class="section-subtitle">📋 모델별 토큰 사용량 상세</h3>
                     <div class="table-wrap">
-                        <table id="tbl-cost"><thead><tr><th></th><th>모델</th><th>총 입력토큰</th><th>총 출력토큰</th><th>총 토큰</th><th>평균 토큰</th><th>정확도</th><th>정답당 토큰</th></tr></thead><tbody></tbody></table>
+                        <table id="tbl-cost"><thead><tr><th></th><th data-t="model">모델</th><th data-t="input_tokens">총 입력토큰</th><th data-t="output_tokens">총 출력토큰</th><th data-t="total_tokens">총 토큰</th><th>평균 토큰</th><th data-t="accuracy">정확도</th><th data-t="token_per_correct">정답당 토큰</th></tr></thead><tbody></tbody></table>
                     </div>
                     
                     <div class="divider"></div>
                     
-                    <h3 class="section-subtitle">📊 토큰 사용량 시각화</h3>
+                    <h3 class="section-subtitle">📊 <span data-t="token_distribution">토큰 사용량 시각화</span></h3>
                     <div class="grid-2">
                         <div class="chart" id="chart-token"></div>
                         <div class="chart" id="chart-tokenstack"></div>
                     </div>
                     
-                    <h3 class="section-subtitle">📈 토큰 효율성 vs 정확도</h3>
+                    <h3 class="section-subtitle">📈 <span data-t="token_efficiency">토큰 효율성</span> vs <span data-t="accuracy">정확도</span></h3>
                     <div class="chart" id="chart-tokenscatter"></div>
                 </div>
 
                 <!-- 테스트셋 통계 -->
                 <div id="tab-testset" class="tab-panel">
-                    <h2 class="section-title">📋 테스트셋 통계</h2>
+                    <h2 class="section-title">📋 <span data-t="testset_stats">테스트셋 통계</span></h2>
                     
                     <h3 class="section-subtitle">📊 테스트셋별 기본 정보</h3>
                     <div class="table-wrap">
-                        <table id="tbl-testset"><thead><tr><th>테스트명</th><th>총 문제 수</th><th>법령 문제</th><th>비법령 문제</th><th>평균 정답률</th></tr></thead><tbody></tbody></table>
+                        <table id="tbl-testset"><thead><tr><th data-t="testname">테스트명</th><th data-t="total_problems">총 문제 수</th><th data-t="law_problems">법령 문제</th><th data-t="non_law_problems">비법령 문제</th><th>평균 정답률</th></tr></thead><tbody></tbody></table>
                     </div>
                     
                     <div class="divider"></div>
@@ -695,7 +885,7 @@
                     
                     <h3 class="section-subtitle">🎯 모델 성능 순위 요약</h3>
                     <div class="table-wrap">
-                        <table id="tbl-ranking"><thead><tr><th>순위</th><th>모델</th><th>정확도</th><th>응답시간</th><th>효율성</th></tr></thead><tbody></tbody></table>
+                        <table id="tbl-ranking"><thead><tr><th>순위</th><th data-t="model">모델</th><th data-t="accuracy">정확도</th><th data-t="response_time">응답시간</th><th data-t="token_efficiency">효율성</th></tr></thead><tbody></tbody></table>
                     </div>
                     
                     <div class="divider"></div>

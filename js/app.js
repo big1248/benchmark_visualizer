@@ -35,7 +35,7 @@ async function loadData() {
         const url = `https://github.com/big1248/benchmark_visualizer/releases/download/v2.2.0/data.zip`;
         loadingText.textContent = 'GitHub에서 데이터 다운로드 중...';
         
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
         let response;
         try {
             response = await fetch(url);

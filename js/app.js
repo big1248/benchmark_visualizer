@@ -217,8 +217,8 @@ function fillSelect(id, options) {
 }
 
 function applyFilters() {
-    const modelFilter = document.getElementById('filterModel')?.value || 'all';
-    const lawFilter = document.getElementById('filterLaw')?.value || 'all';
+    const modelFilter = document.getElementById('modelSelect')?.value || 'all';
+    const lawFilter = document.getElementById('lawSelect')?.value || 'all';
     
     APP.filtered = APP.data.filter(row => {
         if (APP.selectedTests.length > 0 && !APP.selectedTests.includes(row.테스트명)) return false;
@@ -230,7 +230,8 @@ function applyFilters() {
         return true;
     });
     
-    document.getElementById('filteredCount').textContent = APP.filtered.length.toLocaleString();
+    const dataCountEl = document.getElementById('dataCount');
+    if (dataCountEl) dataCountEl.textContent = APP.filtered.length.toLocaleString();
     updateAllCharts();
 }
 

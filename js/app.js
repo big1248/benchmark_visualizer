@@ -161,7 +161,7 @@ function initializeFilters() {
         });
     }
     
-    APP.selectedTests = tests.slice(0, 2);
+    APP.selectedTests = tests; // 모든 테스트 선택
     renderTestTags();
     
     // 모델 선택

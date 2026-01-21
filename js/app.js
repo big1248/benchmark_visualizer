@@ -81,6 +81,7 @@ async function loadData() {
         APP.filtered = [...allData];
         initializeFilters();
         applyFilters();
+        updateOverviewTab(); // 초기 로드 시 바로 업데이트
         loadingOverlay.classList.add('hidden');
     } catch (error) {
         loadingText.textContent = `오류: ${error.message}`;

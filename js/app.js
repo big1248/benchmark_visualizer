@@ -282,13 +282,28 @@ function updateOverviewTab() {
     const models = [...new Set(data.map(d => d.모델).filter(Boolean))];
     const correctCount = data.filter(d => d.정답여부).length;
     
-    document.getElementById('metricTotalProblems').textContent = new Set(data.map(d => d.Question)).size.toLocaleString();
-    document.getElementById('metricModelCount').textContent = models.length;
-    document.getElementById('metricTotalEval').textContent = data.length.toLocaleString();
-    document.getElementById('metricAvgAccuracy').textContent = data.length > 0 ? (correctCount / data.length * 100).toFixed(2) + '%' : '0%';
-    document.getElementById('metricAvgProblems').textContent = models.length > 0 ? Math.round(data.length / models.length).toLocaleString() : '0';
-    document.getElementById('metricAvgCorrect').textContent = models.length > 0 ? Math.round(correctCount / models.length).toLocaleString() : '0';
-    document.getElementById('metricAvgWrong').textContent = models.length > 0 ? Math.round((data.length - correctCount) / models.length).toLocaleString() : '0';
+    // 테스트셋 정보
+    const el = (id) => document.getElementById(id);
+    if (el('m-total')) el('m-total').textContent = new Set(data.map(d => d.Question)).size.toLocaleString();
+    if (el('m-models')) el('m-models').textContent = models.length;
+    if (el('m-evals')) el('m-evals').textContent = data.length.toLocaleString();
+    
+    // 모델 평균 성능
+    if (el('m-acc')) el('m-acc').textContent = data.length > 0 ? (correctCount / data.length * 100).toFixed(2) + '%' : '0%';
+    if (el('m-avgq')) el('m-avgq').textContent = models.length > 0 ? Math.round(data.length / models.length).toLocaleString() : '0';
+    if (el('m-avgc')) el('m-avgc').textContent = models.length > 0 ? Math.round(correctCount / models.length).toLocaleString() : '0';
+    if (el('m-avgw')) el('m-avgw').textContent = models.length > 0 ? Math.round((data.length - correctCount) / models.length).toLocaleString() : '0';
+    
+    // 법령/비법령 분석
+    const lawData = data.filter(d => d.law === 'O');
+    const nonLawData = data.filter(d => d.law !== 'O');
+    const lawCorrect = lawData.filter(d => d.정답여부).length;
+    const nonLawCorrect = nonLawData.filter(d => d.정답여부).length;
+    
+    if (el('m-law')) el('m-law').textContent = lawData.length.toLocaleString();
+    if (el('m-lawacc')) el('m-lawacc').textContent = lawData.length > 0 ? (lawCorrect / lawData.length * 100).toFixed(2) + '%' : '0%';
+    if (el('m-nonlaw')) el('m-nonlaw').textContent = nonLawData.length.toLocaleString();
+    if (el('m-nonlawacc')) el('m-nonlawacc').textContent = nonLawData.length > 0 ? (nonLawCorrect / nonLawData.length * 100).toFixed(2) + '%' : '0%';
     
     const modelStats = {};
     data.forEach(row => {
@@ -300,10 +315,13 @@ function updateOverviewTab() {
     
     const sorted = Object.entries(modelStats).sort((a, b) => (b[1].correct / b[1].total) - (a[1].correct / a[1].total));
     
-    document.querySelector('#tableModelPerformance tbody').innerHTML = sorted.map(([model, stats], i) => {
-        const acc = (stats.correct / stats.total * 100).toFixed(2);
-        return `<tr><td>${i}</td><td>${model}</td><td>${stats.correct}</td><td>${stats.total}</td><td><span class="accuracy-cell" style="background:${getAccuracyColor(parseFloat(acc))}">${acc}%</span></td></tr>`;
-    }).join('');
+    const tbody = document.querySelector('#tbl-perf tbody');
+    if (tbody) {
+        tbody.innerHTML = sorted.map(([model, stats], i) => {
+            const acc = (stats.correct / stats.total * 100).toFixed(2);
+            return `<tr><td>${i}</td><td>${model}</td><td>${stats.correct}</td><td>${stats.total}</td><td><span class="accuracy-cell" style="background:${getAccuracyColor(parseFloat(acc))}">${acc}%</span></td></tr>`;
+        }).join('');
+    }
     
     updateHeatmap(data, sorted.map(m => m[0]));
 }
@@ -324,7 +342,7 @@ function updateHeatmap(data, models) {
         matrix.push(row); textMatrix.push(textRow);
     });
     
-    Plotly.newPlot('chartHeatmap', [{
+    Plotly.newPlot('chart-heatmap', [{
         z: matrix, x: tests, y: models, type: 'heatmap',
         colorscale: [[0,'#e74c3c'],[0.5,'#f1c40f'],[1,'#09ab3b']],
         zmin: 0, zmax: 100, text: textMatrix, texttemplate: '%{text}', textfont: { size: 10 },
@@ -347,16 +365,19 @@ function updateModelTab() {
     const models = sorted.map(m => m[0]);
     const accs = sorted.map(m => m[1].correct / m[1].total * 100);
     
-    Plotly.newPlot('chartModelComparison', [{
+    Plotly.newPlot('chart-modelbar', [{
         x: models, y: accs, type: 'bar', marker: { color: accs.map(v => getAccuracyColor(v)) },
         text: accs.map(v => v.toFixed(1) + '%'), textposition: 'outside'
     }], { ...PLOTLY_LAYOUT, xaxis: { tickangle: -45 }, yaxis: { title: '정확도 (%)', range: [0, Math.max(...accs) * 1.15] } }, PLOTLY_CONFIG);
     
-    document.querySelector('#tableModelDetail tbody').innerHTML = sorted.map(([model, stats], i) => {
-        const acc = (stats.correct / stats.total * 100).toFixed(2);
-        const avgTime = stats.times.length > 0 ? (stats.times.reduce((a,b)=>a+b,0) / stats.times.length).toFixed(2) + '초' : '-';
-        return `<tr><td>${i}</td><td>${model}</td><td>${stats.correct}</td><td>${stats.total}</td><td><span class="accuracy-cell" style="background:${getAccuracyColor(parseFloat(acc))}">${acc}%</span></td><td>${avgTime}</td></tr>`;
-    }).join('');
+    const tbody = document.querySelector('#tbl-model tbody');
+    if (tbody) {
+        tbody.innerHTML = sorted.map(([model, stats], i) => {
+            const acc = (stats.correct / stats.total * 100).toFixed(2);
+            const wrong = stats.total - stats.correct;
+            return `<tr><td>${i}</td><td>${model}</td><td>${stats.correct}</td><td>${stats.total}</td><td><span class="accuracy-cell" style="background:${getAccuracyColor(parseFloat(acc))}">${acc}%</span></td><td>${wrong}</td></tr>`;
+        }).join('');
+    }
 }
 
 function updateResponseTab() {
@@ -376,24 +397,28 @@ function updateResponseTab() {
     let fastestIdx = 0, slowestIdx = 0;
     avgTimes.forEach((t, i) => { if (t < avgTimes[fastestIdx]) fastestIdx = i; if (t > avgTimes[slowestIdx]) slowestIdx = i; });
     
-    document.getElementById('metricFastestModel').textContent = models[fastestIdx] || '-';
-    document.getElementById('metricFastestTime').textContent = `↑ ${avgTimes[fastestIdx]?.toFixed(2) || 0}초`;
-    document.getElementById('metricSlowestModel').textContent = models[slowestIdx] || '-';
-    document.getElementById('metricSlowestTime').textContent = `↑ ${avgTimes[slowestIdx]?.toFixed(2) || 0}초`;
-    document.getElementById('metricAvgResponseTime').textContent = `${(avgTimes.reduce((a,b)=>a+b,0) / avgTimes.length || 0).toFixed(2)}초`;
+    const el = (id) => document.getElementById(id);
+    if (el('m-fastest')) el('m-fastest').textContent = models[fastestIdx] || '-';
+    if (el('m-fastestT')) el('m-fastestT').textContent = `${avgTimes[fastestIdx]?.toFixed(2) || 0}초`;
+    if (el('m-slowest')) el('m-slowest').textContent = models[slowestIdx] || '-';
+    if (el('m-slowestT')) el('m-slowestT').textContent = `${avgTimes[slowestIdx]?.toFixed(2) || 0}초`;
+    if (el('m-avgtime')) el('m-avgtime').textContent = `${(avgTimes.reduce((a,b)=>a+b,0) / avgTimes.length || 0).toFixed(2)}초`;
     
     const sorted = models.map((m, i) => ({ model: m, avg: avgTimes[i], ...modelTimes[m] })).sort((a, b) => a.avg - b.avg);
     
-    document.querySelector('#tableResponseTime tbody').innerHTML = sorted.map((s, i) => {
-        const times = s.times.sort((a,b)=>a-b);
-        const mean = s.avg, median = times[Math.floor(times.length/2)];
-        const std = Math.sqrt(times.reduce((sum,t)=>sum+Math.pow(t-mean,2),0)/times.length);
-        const acc = (s.correct / s.total * 100).toFixed(2);
-        return `<tr><td>${i}</td><td>${s.model}</td><td><span class="accuracy-cell" style="background:${getAccuracyColor(mean*30)}">${mean.toFixed(2)}</span></td><td>${median.toFixed(2)}</td><td>${std.toFixed(2)}</td><td>${Math.min(...times).toFixed(2)}</td><td>${Math.max(...times).toFixed(2)}</td><td>${s.total}</td><td>${acc}%</td></tr>`;
-    }).join('');
+    const tbody = document.querySelector('#tbl-time tbody');
+    if (tbody) {
+        tbody.innerHTML = sorted.map((s, i) => {
+            const times = s.times.sort((a,b)=>a-b);
+            const mean = s.avg, median = times[Math.floor(times.length/2)];
+            const std = Math.sqrt(times.reduce((sum,t)=>sum+Math.pow(t-mean,2),0)/times.length);
+            const acc = (s.correct / s.total * 100).toFixed(2);
+            return `<tr><td>${i}</td><td>${s.model}</td><td><span class="accuracy-cell" style="background:${getAccuracyColor(mean*30)}">${mean.toFixed(2)}</span></td><td>${median.toFixed(2)}</td><td>${std.toFixed(2)}</td><td>${Math.min(...times).toFixed(2)}</td><td>${Math.max(...times).toFixed(2)}</td><td>${s.total}</td><td>${acc}%</td></tr>`;
+        }).join('');
+    }
     
     const scatter = models.map(m => ({ x: modelTimes[m].times.reduce((a,b)=>a+b,0)/modelTimes[m].times.length, y: modelTimes[m].correct/modelTimes[m].total*100, m }));
-    Plotly.newPlot('chartTimeVsAccuracy', [{ x: scatter.map(d=>d.x), y: scatter.map(d=>d.y), mode: 'markers+text', type: 'scatter', text: scatter.map(d=>d.m), textposition: 'top center', marker: { size: 12, color: COLORS.blue } }], { ...PLOTLY_LAYOUT, xaxis: { title: '평균 응답시간 (초)' }, yaxis: { title: '정확도 (%)' } }, PLOTLY_CONFIG);
+    Plotly.newPlot('chart-timescatter', [{ x: scatter.map(d=>d.x), y: scatter.map(d=>d.y), mode: 'markers+text', type: 'scatter', text: scatter.map(d=>d.m), textposition: 'top center', marker: { size: 12, color: COLORS.blue } }], { ...PLOTLY_LAYOUT, xaxis: { title: '평균 응답시간 (초)' }, yaxis: { title: '정확도 (%)' } }, PLOTLY_CONFIG);
 }
 
 function updateLawTab() {
@@ -401,12 +426,14 @@ function updateLawTab() {
     const lawCount = data.filter(d => d.law === 'O').length;
     const nonLawCount = data.length - lawCount;
     
-    Plotly.newPlot('chartLawDistribution', [{ values: [lawCount, nonLawCount], labels: ['법령', '비법령'], type: 'pie', marker: { colors: [COLORS.blue, COLORS.green] } }], PLOTLY_LAYOUT, PLOTLY_CONFIG);
+    const el = (id) => document.getElementById(id);
+    if (el('m-law2')) el('m-law2').textContent = lawCount.toLocaleString();
+    if (el('m-nonlaw2')) el('m-nonlaw2').textContent = nonLawCount.toLocaleString();
+    
+    Plotly.newPlot('chart-lawpie', [{ values: [lawCount, nonLawCount], labels: ['법령', '비법령'], type: 'pie', marker: { colors: [COLORS.blue, COLORS.green] } }], PLOTLY_LAYOUT, PLOTLY_CONFIG);
     
     const lawAcc = lawCount > 0 ? data.filter(d => d.law === 'O' && d.정답여부).length / lawCount * 100 : 0;
     const nonLawAcc = nonLawCount > 0 ? data.filter(d => d.law !== 'O' && d.정답여부).length / nonLawCount * 100 : 0;
-    
-    Plotly.newPlot('chartLawAccuracy', [{ x: ['법령', '비법령'], y: [lawAcc, nonLawAcc], type: 'bar', marker: { color: [COLORS.blue, COLORS.green] }, text: [lawAcc.toFixed(1)+'%', nonLawAcc.toFixed(1)+'%'], textposition: 'outside' }], { ...PLOTLY_LAYOUT, yaxis: { title: '정확도 (%)', range: [0, 100] } }, PLOTLY_CONFIG);
     
     const modelLaw = {};
     data.forEach(row => {
@@ -416,7 +443,7 @@ function updateLawTab() {
         else { modelLaw[row.모델].nT++; if (row.정답여부) modelLaw[row.모델].nC++; }
     });
     const models = Object.keys(modelLaw);
-    Plotly.newPlot('chartModelLawPerformance', [
+    Plotly.newPlot('chart-lawmodel', [
         { x: models, y: models.map(m => modelLaw[m].lT > 0 ? modelLaw[m].lC/modelLaw[m].lT*100 : 0), name: '법령', type: 'bar', marker: { color: COLORS.blue } },
         { x: models, y: models.map(m => modelLaw[m].nT > 0 ? modelLaw[m].nC/modelLaw[m].nT*100 : 0), name: '비법령', type: 'bar', marker: { color: COLORS.green } }
     ], { ...PLOTLY_LAYOUT, barmode: 'group', xaxis: { tickangle: -45 }, yaxis: { title: '정확도 (%)', range: [0, 100] } }, PLOTLY_CONFIG);
@@ -434,12 +461,15 @@ function updateSubjectTab() {
     
     const sorted = Object.entries(subjectStats).sort((a, b) => (b[1].correct/b[1].total) - (a[1].correct/a[1].total));
     
-    document.querySelector('#tableSubject tbody').innerHTML = sorted.map(([subj, stats], i) => {
-        const acc = (stats.correct / stats.total * 100).toFixed(2);
-        return `<tr><td>${i}</td><td>${subj}</td><td>${stats.correct}</td><td>${stats.total}</td><td><span class="accuracy-cell" style="background:${getAccuracyColor(parseFloat(acc))}">${acc}%</span></td></tr>`;
-    }).join('');
+    const tbody = document.querySelector('#tbl-subject tbody');
+    if (tbody) {
+        tbody.innerHTML = sorted.map(([subj, stats], i) => {
+            const acc = (stats.correct / stats.total * 100).toFixed(2);
+            return `<tr><td>${i}</td><td>${subj}</td><td>${stats.correct}</td><td>${stats.total}</td><td><span class="accuracy-cell" style="background:${getAccuracyColor(parseFloat(acc))}">${acc}%</span></td></tr>`;
+        }).join('');
+    }
     
-    Plotly.newPlot('chartSubjectAccuracy', [{ y: sorted.map(s=>s[0]), x: sorted.map(s=>s[1].correct/s[1].total*100), type: 'bar', orientation: 'h', marker: { color: sorted.map(s=>getAccuracyColor(s[1].correct/s[1].total*100)) } }], { ...PLOTLY_LAYOUT, margin: { l: 200 }, xaxis: { title: '정확도 (%)', range: [0, 100] } }, PLOTLY_CONFIG);
+    Plotly.newPlot('chart-subject', [{ y: sorted.map(s=>s[0]), x: sorted.map(s=>s[1].correct/s[1].total*100), type: 'bar', orientation: 'h', marker: { color: sorted.map(s=>getAccuracyColor(s[1].correct/s[1].total*100)) } }], { ...PLOTLY_LAYOUT, margin: { l: 200 }, xaxis: { title: '정확도 (%)', range: [0, 100] } }, PLOTLY_CONFIG);
 }
 
 function updateYearTab() {
@@ -453,8 +483,8 @@ function updateYearTab() {
     });
     
     const years = Object.keys(yearStats).sort();
-    Plotly.newPlot('chartYearCount', [{ x: years, y: years.map(y => yearStats[y].total), type: 'bar', marker: { color: COLORS.blue } }], { ...PLOTLY_LAYOUT, xaxis: { title: '연도' }, yaxis: { title: '문제 수' } }, PLOTLY_CONFIG);
-    Plotly.newPlot('chartYearAccuracy', [{ x: years, y: years.map(y => yearStats[y].correct/yearStats[y].total*100), type: 'scatter', mode: 'lines+markers', marker: { color: COLORS.green }, line: { color: COLORS.green } }], { ...PLOTLY_LAYOUT, xaxis: { title: '연도' }, yaxis: { title: '정확도 (%)', range: [0, 100] } }, PLOTLY_CONFIG);
+    Plotly.newPlot('chart-yearcount', [{ x: years, y: years.map(y => yearStats[y].total), type: 'bar', marker: { color: COLORS.blue } }], { ...PLOTLY_LAYOUT, xaxis: { title: '연도' }, yaxis: { title: '문제 수' } }, PLOTLY_CONFIG);
+    Plotly.newPlot('chart-yearacc', [{ x: years, y: years.map(y => yearStats[y].correct/yearStats[y].total*100), type: 'scatter', mode: 'lines+markers', marker: { color: COLORS.green }, line: { color: COLORS.green } }], { ...PLOTLY_LAYOUT, xaxis: { title: '연도' }, yaxis: { title: '정확도 (%)', range: [0, 100] } }, PLOTLY_CONFIG);
 }
 
 function updateIncorrectTab() {
@@ -469,13 +499,20 @@ function updateIncorrectTab() {
     
     const sorted = Object.entries(qStats).filter(([q,s]) => s.total >= 2).sort((a,b) => (b[1].incorrect/b[1].total) - (a[1].incorrect/a[1].total)).slice(0, 20);
     
-    document.querySelector('#tableTopIncorrect tbody').innerHTML = sorted.map(([q, s], i) => {
-        const rate = (s.incorrect / s.total * 100).toFixed(1);
-        return `<tr><td>${i+1}</td><td>${s.test||'-'}</td><td>${s.subj||'-'}</td><td>${s.year||'-'}</td><td style="color:#e74c3c">${s.incorrect}</td><td>${s.total}</td><td style="color:#e74c3c;font-weight:600">${rate}%</td></tr>`;
-    }).join('');
+    const tbody = document.querySelector('#tbl-error tbody');
+    if (tbody) {
+        tbody.innerHTML = sorted.map(([q, s], i) => {
+            const rate = (s.incorrect / s.total * 100).toFixed(1);
+            return `<tr><td>${i+1}</td><td>${s.test||'-'}</td><td>${s.subj||'-'}</td><td>${s.year||'-'}</td><td style="color:#e74c3c">${s.incorrect}</td><td>${s.total}</td><td style="color:#e74c3c;font-weight:600">${rate}%</td></tr>`;
+        }).join('');
+    }
     
     const models = [...new Set(data.map(d => d.모델).filter(Boolean))];
-    if (models.length < 2) { document.getElementById('chartErrorAgreement').innerHTML = '<p style="text-align:center;padding:2rem;color:#666">모델이 2개 이상 필요합니다.</p>'; return; }
+    if (models.length < 2) { 
+        const el = document.getElementById('chart-errorheat');
+        if (el) el.innerHTML = '<p style="text-align:center;padding:2rem;color:#666">모델이 2개 이상 필요합니다.</p>'; 
+        return; 
+    }
     
     const modelErrors = {};
     models.forEach(m => { modelErrors[m] = new Set(data.filter(d => d.모델 === m && !d.정답여부).map(d => d.Question)); });
@@ -487,7 +524,7 @@ function updateIncorrectTab() {
         return union.size > 0 ? inter.size / union.size * 100 : 0;
     }));
     
-    Plotly.newPlot('chartErrorAgreement', [{ z: matrix, x: models, y: models, type: 'heatmap', colorscale: 'Reds', colorbar: { title: '일치도 (%)' } }], { ...PLOTLY_LAYOUT, margin: { l: 150, r: 50, t: 30, b: 100 }, xaxis: { tickangle: -45 } }, PLOTLY_CONFIG);
+    Plotly.newPlot('chart-errorheat', [{ z: matrix, x: models, y: models, type: 'heatmap', colorscale: 'Reds', colorbar: { title: '일치도 (%)' } }], { ...PLOTLY_LAYOUT, margin: { l: 150, r: 50, t: 30, b: 100 }, xaxis: { tickangle: -45 } }, PLOTLY_CONFIG);
 }
 
 function updateDifficultyTab() {
@@ -510,7 +547,7 @@ function updateDifficultyTab() {
         else ranges['매우 쉬움 (80-100%)']++;
     });
     
-    Plotly.newPlot('chartDifficultyDistribution', [{ x: Object.keys(ranges), y: Object.values(ranges), type: 'bar', marker: { color: ['#e74c3c', '#f39c12', '#f1c40f', '#2ecc71', '#09ab3b'] } }], { ...PLOTLY_LAYOUT, xaxis: { tickangle: -30 }, yaxis: { title: '문제 수' } }, PLOTLY_CONFIG);
+    Plotly.newPlot('chart-diffdist', [{ x: Object.keys(ranges), y: Object.values(ranges), type: 'bar', marker: { color: ['#e74c3c', '#f39c12', '#f1c40f', '#2ecc71', '#09ab3b'] } }], { ...PLOTLY_LAYOUT, xaxis: { tickangle: -30 }, yaxis: { title: '문제 수' } }, PLOTLY_CONFIG);
     
     const modelDiff = {};
     data.forEach(row => {
@@ -527,7 +564,7 @@ function updateDifficultyTab() {
     const diffRanges = ['매우 어려움', '어려움', '보통', '쉬움', '매우 쉬움'];
     const colors = ['#e74c3c', '#f39c12', '#f1c40f', '#2ecc71', '#09ab3b'];
     
-    Plotly.newPlot('chartModelDifficulty', diffRanges.map((r, i) => ({
+    Plotly.newPlot('chart-diffmodel', diffRanges.map((r, i) => ({
         x: models, y: models.map(m => modelDiff[m][r] ? modelDiff[m][r].correct / modelDiff[m][r].total * 100 : 0),
         name: r, type: 'bar', marker: { color: colors[i] }
     })), { ...PLOTLY_LAYOUT, barmode: 'group', xaxis: { tickangle: -45 }, yaxis: { title: '정확도 (%)', range: [0, 100] } }, PLOTLY_CONFIG);

@@ -27,9 +27,9 @@ const COLORS = { primary: '#ff4b4b', blue: '#0068c9', green: '#09ab3b', orange: 
 // ============================================================
 
 async function loadData() {
-    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingOverlay = document.getElementById('loading');
     const loadingText = document.getElementById('loadingText');
-    const loadingProgressBar = document.getElementById('loadingProgressBar');
+    const loadingProgressBar = document.getElementById('progressFill');
     
     try {
         loadingText.textContent = '데이터 다운로드 중...';
@@ -127,7 +127,7 @@ function loadSampleData() {
     APP.filtered = [...sampleData];
     initializeFilters();
     applyFilters();
-    document.getElementById('loadingOverlay').classList.add('hidden');
+    document.getElementById('loading').classList.add('hidden');
 }
 
 // ============================================================

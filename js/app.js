@@ -57,7 +57,10 @@ async function loadData() {
         loadingText.textContent = 'CSV 파일 파싱 중...';
         const blob = new Blob(chunks);
         const zip = await JSZip.loadAsync(blob);
-        const csvFiles = Object.keys(zip.files).filter(name => name.endsWith('.csv'));
+        // testset 파일 제외 (원본 시험 데이터)
+        const csvFiles = Object.keys(zip.files).filter(name => 
+            name.endsWith('.csv') && !name.toLowerCase().startsWith('testset')
+        );
         
         const allData = [];
         for (const filename of csvFiles) {

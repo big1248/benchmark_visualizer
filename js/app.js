@@ -134,30 +134,46 @@ function loadSampleData() {
 function initializeFilters() {
     const tests = [...new Set(APP.data.map(d => d.테스트명).filter(Boolean))].sort();
     const models = [...new Set(APP.data.map(d => d.모델).filter(Boolean))].sort();
+    const details = [...new Set(APP.data.map(d => d._detail).filter(Boolean))].sort();
+    const promptings = [...new Set(APP.data.map(d => d._prompting).filter(Boolean))].sort();
+    const years = [...new Set(APP.data.map(d => d.Year).filter(Boolean))].sort();
     
-    const testAddSelect = document.getElementById('filterTestAdd');
-    testAddSelect.innerHTML = '<option value="">+ 테스트 추가</option>';
-    tests.forEach(test => {
-        const opt = document.createElement('option');
-        opt.value = test; opt.textContent = test;
-        testAddSelect.appendChild(opt);
-    });
+    // 테스트 선택
+    const testAddSelect = document.getElementById('testSelect');
+    if (testAddSelect) {
+        testAddSelect.innerHTML = '<option value="">+ 테스트 추가</option>';
+        tests.forEach(test => {
+            const opt = document.createElement('option');
+            opt.value = test; opt.textContent = test;
+            testAddSelect.appendChild(opt);
+        });
+        
+        testAddSelect.addEventListener('change', (e) => {
+            if (e.target.value && !APP.selectedTests.includes(e.target.value)) {
+                APP.selectedTests.push(e.target.value);
+                renderTestTags();
+                applyFilters();
+            }
+            e.target.value = '';
+        });
+    }
     
     APP.selectedTests = tests.slice(0, 2);
     renderTestTags();
     
-    fillSelect('filterModel', models);
+    // 모델 선택
+    fillSelect('modelSelect', models);
     
-    testAddSelect.addEventListener('change', (e) => {
-        if (e.target.value && !APP.selectedTests.includes(e.target.value)) {
-            APP.selectedTests.push(e.target.value);
-            renderTestTags();
-            applyFilters();
-        }
-        e.target.value = '';
-    });
+    // 상세도 선택
+    fillSelect('detailSelect', details);
     
-    ['filterModel', 'filterDetail', 'filterPrompting', 'filterProblemType', 'filterLaw'].forEach(id => {
+    // 프롬프팅 선택
+    fillSelect('promptSelect', promptings);
+    
+    // 연도 선택
+    fillSelect('yearSelect', years);
+    
+    ['modelSelect', 'detailSelect', 'promptSelect', 'yearSelect', 'typeSelect', 'lawSelect'].forEach(id => {
         document.getElementById(id)?.addEventListener('change', applyFilters);
     });
     

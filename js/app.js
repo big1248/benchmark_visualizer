@@ -32,46 +32,55 @@ async function loadData() {
     const loadingProgressBar = document.getElementById('loadingProgressBar');
     
     try {
-        // 1. data/index.json에서 파일 목록 가져오기
-        loadingText.textContent = '파일 목록 로딩 중...';
-        const indexResponse = await fetch('data/index.json');
-        if (!indexResponse.ok) throw new Error('index.json을 찾을 수 없습니다');
-        const csvFiles = await indexResponse.json();
+        const url = `https://github.com/big1248/benchmark_visualizer/releases/download/v2.2.0/data.zip`;
+        loadingText.textContent = 'GitHub에서 데이터 다운로드 중...';
         
-        loadingText.textContent = `CSV 파일 로딩 중... (0/${csvFiles.length})`;
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+        let response;
+        try {
+            response = await fetch(url);
+            if (!response.ok) throw new Error('Direct failed');
+        } catch (e) {
+            response = await fetch(proxyUrl);
+        }
+        
+        const reader = response.body.getReader();
+        const contentLength = response.headers.get('Content-Length');
+        let receivedLength = 0;
+        const chunks = [];
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            receivedLength += value.length;
+            if (contentLength && loadingProgressBar) {
+                const progress = (receivedLength / contentLength) * 100;
+                loadingProgressBar.style.width = `${progress}%`;
+            }
+        }
+        
+        loadingText.textContent = 'CSV 파일 파싱 중...';
+        const blob = new Blob(chunks);
+        const zip = await JSZip.loadAsync(blob);
+        const csvFiles = Object.keys(zip.files).filter(name => name.endsWith('.csv'));
         
         const allData = [];
-        let loaded = 0;
-        
-        // 2. 각 CSV 파일 로드
         for (const filename of csvFiles) {
-            try {
-                const response = await fetch(`data/${filename}`);
-                if (!response.ok) continue;
-                
-                const content = await response.text();
-                const fileInfo = parseFilename(filename);
-                const parsed = Papa.parse(content, { header: true, skipEmptyLines: true, dynamicTyping: true });
-                
-                parsed.data.forEach(row => {
-                    if (row.Question || row.ID) {
-                        row.모델 = row.모델명 || fileInfo.model;
-                        row.테스트명 = row['Test Name'] || fileInfo.testname;
-                        row.정답여부 = row.정답여부 === true || row.정답여부 === 'True' || row.정답여부 === 1;
-                        row._detail = fileInfo.detail;
-                        row._prompting = fileInfo.prompting;
-                        allData.push(row);
-                    }
-                });
-                
-                loaded++;
-                loadingText.textContent = `CSV 파일 로딩 중... (${loaded}/${csvFiles.length})`;
-                if (loadingProgressBar) {
-                    loadingProgressBar.style.width = `${(loaded / csvFiles.length) * 100}%`;
+            const content = await zip.files[filename].async('text');
+            const fileInfo = parseFilename(filename);
+            const parsed = Papa.parse(content, { header: true, skipEmptyLines: true, dynamicTyping: true });
+            
+            parsed.data.forEach(row => {
+                if (row.Question || row.ID) {
+                    row.모델 = row.모델명 || fileInfo.model;
+                    row.테스트명 = row['Test Name'] || fileInfo.testname;
+                    row.정답여부 = row.정답여부 === true || row.정답여부 === 'True' || row.정답여부 === 1;
+                    row._detail = fileInfo.detail;
+                    row._prompting = fileInfo.prompting;
+                    allData.push(row);
                 }
-            } catch (e) {
-                console.warn(`파일 로드 실패: ${filename}`, e);
-            }
+            });
         }
         
         APP.data = allData;

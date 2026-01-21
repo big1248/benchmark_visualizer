@@ -288,7 +288,7 @@ function updateOverviewTab() {
     
     // 테스트셋 정보
     const el = (id) => document.getElementById(id);
-    if (el('m-total')) el('m-total').textContent = new Set(data.map(d => d.Question)).size.toLocaleString();
+    if (el('m-total')) el('m-total').textContent = models.length > 0 ? Math.round(data.length / models.length).toLocaleString() : '0';
     if (el('m-models')) el('m-models').textContent = models.length;
     if (el('m-evals')) el('m-evals').textContent = data.length.toLocaleString();
     

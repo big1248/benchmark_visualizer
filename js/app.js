@@ -32,17 +32,11 @@ async function loadData() {
     const loadingProgressBar = document.getElementById('loadingProgressBar');
     
     try {
-        const url = `https://github.com/big1248/benchmark_visualizer/releases/download/v2.2.0/data.zip`;
-        loadingText.textContent = 'GitHub에서 데이터 다운로드 중...';
+        loadingText.textContent = '데이터 다운로드 중...';
         
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-        let response;
-        try {
-            response = await fetch(url);
-            if (!response.ok) throw new Error('Direct failed');
-        } catch (e) {
-            response = await fetch(proxyUrl);
-        }
+        // 같은 사이트에서 직접 로드 (프록시 필요 없음)
+        const response = await fetch('data.zip');
+        if (!response.ok) throw new Error('data.zip을 찾을 수 없습니다');
         
         const reader = response.body.getReader();
         const contentLength = response.headers.get('Content-Length');
